@@ -54,6 +54,7 @@ class GRUModel(nn.Module):
         embedding_size: int,
         gru_hidden_size: int,
         gru_num_layers: int,
+        n_actions: int,
     ):
         super().__init__()
 
@@ -63,11 +64,19 @@ class GRUModel(nn.Module):
             nn.LazyLinear(embedding_size),
             nn.LayerNorm(embedding_size),
         )
+        self.gru = nn.GRU(
+            input_size=embedding_size,
+            hidden_size=gru_hidden_size,
+            num_layers=gru_num_layers,
+        )
+        self.action_head = nn.Linear(gru_hidden_size, n_actions)
 
     def forward(
-        self, x: torch.Tensor, memory: Optional[torch.Tensor]
+        self, x: torch.Tensor, memory: Optional[torch.Tensor] = None
     ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
-        """
+        """Predict the action to take for each patch in the batch.
+        It is a one-step prediction, the memory is used to remember about
+        the previous encountered patches.
 
         ---
         Args:
@@ -83,4 +92,15 @@ class GRUModel(nn.Module):
             memory: The memory of the current step.
                 Shape of [gru_n_layers, batch_size, gru_hidden_size].
         """
-        pass
+        # Project the image to [batch_size, embedding_size].
+        x = self.cnn_encoder(x)
+        x = self.project(x)
+
+        # Run the GRU.
+        x = x.unsqueeze(0)  # Add a fictive time dimension.
+        x, memory = self.gru(x, memory)
+        x = x.squeeze(0)  # Remove the fictive dimension.
+
+        # Compute the action.
+        x = self.action_head(x)
+        return x, memory
