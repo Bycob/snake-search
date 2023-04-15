@@ -1,0 +1,19 @@
+env:
+  patch_size: 32
+  max_ep_len: 10
+data:
+  batch_size: 32
+model:
+  n_channels: [3, 5, 10, 10]
+  kernels: [3, 3, 3]
+  embedding_size: 24
+  gru_hidden_size: 12
+  gru_num_layers: 2
+optimizer:
+  learning_rate: 1.0e-4
+reinforce:
+  n_iterations: 10
+device: auto
+hydra:
+  job:
+    chdir: true

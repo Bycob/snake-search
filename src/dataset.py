@@ -1,9 +1,11 @@
+from pathlib import Path
+
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import CelebA
 from torchvision.transforms import ToTensor
 
-from .env import BBox, NeedleEnv, Position
+from .env import BBox, Position
 
 
 class CelebADataset(Dataset):
@@ -13,9 +15,9 @@ class CelebADataset(Dataset):
     The images are of shape [3, 218, 178].
     """
 
-    def __init__(self, split: str):
+    def __init__(self, split: str, root: Path):
         self.dataset = CelebA(
-            root="./data",
+            root=str(root),
             split=split,
             target_type="landmarks",
             download=True,
@@ -103,19 +105,19 @@ class NeedleDataset(Dataset):
         bboxes = [bbox]
         return image, bboxes
 
+    def __len__(self):
+        return len(self.celeb_dataset)
 
-def init_datasets() -> tuple[NeedleDataset, NeedleDataset]:
-    """Initialize the train and test datasets.
-
-    ---
-    Returns:
-        train_dataset: The train dataset.
-        test_dataset: The test dataset.
-    """
-    celeb_dataset = CelebADataset("train")
-    train_dataset = NeedleDataset(celeb_dataset)
-
-    celeb_dataset = CelebADataset("test")
-    test_dataset = NeedleDataset(celeb_dataset)
-
-    return train_dataset, test_dataset
+    @staticmethod
+    def collate_fn(
+        batch: list[tuple[torch.Tensor, list[BBox]]]
+    ) -> tuple[torch.Tensor, list[list[BBox]]]:
+        """Collate the batch of images and bboxes.
+        The images are stacked in a tensor and the bboxes are stacked in a list.
+        """
+        images, bboxes = [], []
+        for image, bbox in batch:
+            images.append(image)
+            bboxes.append(bbox)
+        images = torch.stack(images, dim=0)
+        return images, bboxes

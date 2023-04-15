@@ -17,6 +17,8 @@ positional-encodings = {extras = ["pytorch"], version = "^6.0.1"}
 wandb = "^0.14.2"
 matplotlib = "^3.7.1"
 torchvision = "^0.15.1"
+hydra-core = "^1.3.2"
+tqdm = "^4.65.0"
 
 
 [tool.poetry.group.test.dependencies]

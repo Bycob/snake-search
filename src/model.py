@@ -46,7 +46,7 @@ class CNNEncoder(nn.Module):
         return x
 
 
-class GRUModel(nn.Module):
+class GRUPolicy(nn.Module):
     def __init__(
         self,
         n_channels: list[int],
@@ -83,14 +83,14 @@ class GRUModel(nn.Module):
             x: The batch of patches of images.
                 Shape of [batch_size, num_channels, patch_size, patch_size].
             memory: The memory of the previous step.
-                Shape of [gru_n_layers, batch_size, gru_hidden_size].
+                Shape of [gru_num_layers, batch_size, gru_hidden_size].
 
         ---
         Returns:
             action: The action to take.
                 Shape of [batch_size, n_actions].
             memory: The memory of the current step.
-                Shape of [gru_n_layers, batch_size, gru_hidden_size].
+                Shape of [gru_num_layers, batch_size, gru_hidden_size].
         """
         # Project the image to [batch_size, embedding_size].
         x = self.cnn_encoder(x)
