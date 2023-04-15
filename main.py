@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from hydra.utils import to_absolute_path
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler
 from torchinfo import summary
@@ -94,8 +94,13 @@ def main(config: DictConfig):
         optimizer=optimizer,
         train_loader=train_lodaer,
         test_loader=test_loader,
+        patch_size=config.env.patch_size,
+        max_ep_len=config.env.max_ep_len,
         n_iterations=config.reinforce.n_iterations,
         device=config.device,
+    )
+    reinforce.launch_training(
+        config.group, OmegaConf.to_container(config, resolve=True)
     )
 
 

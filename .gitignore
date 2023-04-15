@@ -1,6 +1,5 @@
-data/
+.data/
 .venv/
-test.py
 .pytest_cache/
 outputs/
 **/__pycache__/
