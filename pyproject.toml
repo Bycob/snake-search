@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "snake-search"
+version = "0.1.0"
+description = ""
+authors = ["Pierrot LeCon <pstmrtem@outlook.com>"]
+license = "Searching an object in an image using a RL agent."
+readme = "README.md"
+packages = [{include = "snake_search"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = "^2.0.0"
+gymnasium = "^0.28.1"
+torchinfo = "^1.7.2"
+einops = "^0.6.0"
+positional-encodings = {extras = ["pytorch"], version = "^6.0.1"}
+wandb = "^0.14.2"
+matplotlib = "^3.7.1"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.3.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
