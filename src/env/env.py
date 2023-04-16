@@ -87,6 +87,7 @@ class NeedleEnv(gym.Env):
 
         # Bounding boxes of the images.
         self.bboxes, self.bbox_masks = self.parse_bboxes(bboxes)
+        self.original_bboxes = bboxes
 
         # Initialize some variables for the environment.
         self.init_env_variables()

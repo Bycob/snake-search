@@ -43,16 +43,18 @@ def init_dataloaders(
         batch_size=config.data.batch_size,
         collate_fn=lambda b: NeedleDataset.collate_fn(b, config.env.patch_size),
         num_workers=config.data.num_workers,
-        sampler=RandomSampler(train_dataset, replacement=True),
+        sampler=RandomSampler(train_dataset, replacement=True, num_samples=int(1e10)),
         shuffle=False,
+        pin_memory=True,
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=config.data.batch_size,
         collate_fn=lambda b: NeedleDataset.collate_fn(b, config.env.patch_size),
         num_workers=config.data.num_workers,
-        sampler=RandomSampler(test_dataset, replacement=True),
+        sampler=RandomSampler(test_dataset, replacement=True, num_samples=int(1e10)),
         shuffle=False,
+        pin_memory=True,
     )
     return train_loader, test_loader
 
@@ -64,7 +66,7 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
         embedding_size=config.model.embedding_size,
         gru_hidden_size=config.model.gru_hidden_size,
         gru_num_layers=config.model.gru_num_layers,
-        n_actions=4,
+        n_actions=5,
     )
     image, _ = dataset[0]
     n_channels = image.shape[0]
@@ -97,6 +99,7 @@ def main(config: DictConfig):
         patch_size=config.env.patch_size,
         max_ep_len=config.env.max_ep_len,
         n_iterations=config.reinforce.n_iterations,
+        plot_every=config.reinforce.plot_every,
         device=config.device,
     )
     reinforce.launch_training(
