@@ -53,6 +53,10 @@ class Reinforce:
             env.max_ep_len,
             device=self.device,
         )
+        percentages = torch.zeros(
+            env.batch_size,
+            device=self.device,
+        )
 
         memory = None
         patches, _ = env.reset()
@@ -62,10 +66,11 @@ class Reinforce:
             categorical = Categorical(logits=logits)
             actions = categorical.sample()
 
-            patches, step_rewards, _, _, _ = env.step(actions)
+            patches, step_rewards, _, _, infos = env.step(actions)
 
             rewards[:, step_id] = step_rewards
             logprobs[:, step_id] = categorical.log_prob(actions)
+            percentages = infos["percentages"]
 
         rewards = torch.flip(rewards, dims=(1,))
         cumulated_returns = torch.cumsum(rewards, dim=1)
@@ -76,6 +81,7 @@ class Reinforce:
             "rewards": rewards,
             "returns": cumulated_returns,
             "logprobs": logprobs,
+            "percentages": percentages,
         }
 
     def compute_metrics(
@@ -99,6 +105,7 @@ class Reinforce:
         )
         metrics["loss"] = -(rollout["logprobs"] * advantages).sum(dim=1).mean()
         metrics["returns"] = rollout["rewards"].sum(dim=1).mean()
+        metrics["percentages"] = rollout["percentages"].mean()
         return metrics
 
     def launch_training(self, group: str, config: dict[str, Any]):

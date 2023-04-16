@@ -14,7 +14,7 @@ model:
 optimizer:
   learning_rate: 1.0e-4
 reinforce:
-  n_iterations: 40000
+  n_iterations: 8000
   plot_every: 100
 device: auto
 hydra:

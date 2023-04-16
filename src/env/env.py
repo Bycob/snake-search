@@ -120,6 +120,25 @@ class NeedleEnv(gym.Env):
             device=self.device,
         )
 
+    def get_infos(self) -> dict[str, Tensor]:
+        """Returns some contextual information about the environment.
+
+        ---
+        Returns:
+            A dictionary of information.
+            Content:
+                positions: The positions of the agents.
+                    Shape of [batch_size, 2].
+                percentages: The percentage of patches found.
+                    Shape of [batch_size,].
+        """
+        at_least_one_bbox = self.bbox_masks.max(dim=-1).values
+        percentages = self.scores / at_least_one_bbox.sum(dim=(1, 2))
+        return {
+            "positions": self.positions,
+            "percentages": percentages,
+        }
+
     def reset(self) -> tuple[Tensor, dict]:
         """Reset the environment variables.
         Randomly initialize the positions of the agents.
@@ -139,7 +158,7 @@ class NeedleEnv(gym.Env):
         )
         self.visited_patches = self.visited_patches | self.tiles_reached
         self.terminated = self.scores == self.max_scores
-        return self.patches, {"positions": self.positions}
+        return self.patches, self.get_infos()
 
     @torch.no_grad()
     def step(self, actions: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, dict]:
@@ -162,7 +181,7 @@ class NeedleEnv(gym.Env):
                 Shape of [batch_size,].
             infos: Additional infos.
         """
-        previous_score = self.scores
+        previous_scores = self.scores
 
         # Apply the actions.
         movements = self.parse_actions(actions)
@@ -172,12 +191,11 @@ class NeedleEnv(gym.Env):
 
         # Compute the rewards and terminaisons.
         new_scores = self.scores
-        rewards = new_scores - previous_score
+        rewards = new_scores - previous_scores
         self.terminated |= new_scores == self.max_scores
         truncated = self.steps >= self.max_ep_len
-        infos = {
-            "positions": self.positions,
-        }
+
+        infos = self.get_infos()
 
         return self.patches, rewards, self.terminated, truncated, infos
 
