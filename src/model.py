@@ -23,6 +23,7 @@ class CNNEncoder(nn.Module):
                     ),
                     nn.GELU(),
                     nn.GroupNorm(num_groups=1, num_channels=n_channels[layer_id + 1]),
+                    nn.MaxPool2d(kernel_size=2, stride=2),
                 )
                 for layer_id in range(len(kernels))
             ]

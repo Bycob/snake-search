@@ -1,11 +1,13 @@
+group: Test
 env:
   patch_size: 32
   max_ep_len: 10
 data:
   batch_size: 32
+  num_workers: 0
 model:
   n_channels: [3, 5, 10, 10]
-  kernels: [3, 3, 3]
+  kernels: [5, 5, 5]
   embedding_size: 24
   gru_hidden_size: 12
   gru_num_layers: 2

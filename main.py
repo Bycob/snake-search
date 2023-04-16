@@ -41,7 +41,7 @@ def init_dataloaders(
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.data.batch_size,
-        collate_fn=train_dataset.collate_fn,
+        collate_fn=lambda b: NeedleDataset.collate_fn(b, config.env.patch_size),
         num_workers=config.data.num_workers,
         sampler=RandomSampler(train_dataset, replacement=True),
         shuffle=False,
@@ -49,7 +49,7 @@ def init_dataloaders(
     test_loader = DataLoader(
         test_dataset,
         batch_size=config.data.batch_size,
-        collate_fn=test_dataset.collate_fn,
+        collate_fn=lambda b: NeedleDataset.collate_fn(b, config.env.patch_size),
         num_workers=config.data.num_workers,
         sampler=RandomSampler(test_dataset, replacement=True),
         shuffle=False,
@@ -70,7 +70,7 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
     n_channels = image.shape[0]
     summary(
         model,
-        input_size=(1, n_channels, config.patch_size, config.patch_size),
+        input_size=(1, n_channels, config.env.patch_size, config.env.patch_size),
     )
     return model
 
