@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Iterator
 
 import torch
 import wandb
@@ -13,6 +13,10 @@ from .plot import plot_trajectory
 
 
 class Reinforce:
+    """The REINFORCE algorithm.
+    It used to train the model, on a batched environment.
+    """
+
     def __init__(
         self,
         model: GRUPolicy,
@@ -36,6 +40,9 @@ class Reinforce:
         self.device = device
 
     def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
+        """Do a rollout on the given environment.
+        Returns the rewards, returns and logprobs of the rollout.
+        """
         rewards = torch.zeros(
             env.batch_size,
             env.max_ep_len,
@@ -74,6 +81,16 @@ class Reinforce:
     def compute_metrics(
         self, rollout: dict[str, torch.Tensor]
     ) -> dict[str, torch.Tensor]:
+        """Compute the metrics of the given rollout.
+
+        ---
+        Args:
+            rollout: A dictionary containing the rewards, returns and logprobs.
+
+        ---
+        Returns:
+            The metrics, containing the loss.
+        """
         metrics = dict()
         returns = rollout["returns"]
 
@@ -85,10 +102,19 @@ class Reinforce:
         return metrics
 
     def launch_training(self, group: str, config: dict[str, Any]):
+        """Train the model using REINFORCE.
+        The logs are sent to Weights & Biases.
+
+        ---
+        Args:
+            group: The name of the group of experiments.
+            config: A dictionary of hyperparameters.
+        """
         print(f"Launching REINFORCE on device {self.device}")
         self.model.to(self.device)
 
         train_iter = iter(self.train_loader)
+        test_iter = iter(self.test_loader)
 
         with wandb.init(
             project="snake-search",
@@ -114,20 +140,28 @@ class Reinforce:
 
                 if step_id % self.plot_every == 0:
                     # Log the trajectories on a batch of images.
-                    images, bboxes = next(iter(self.test_loader))
-                    images = images.to(self.device)
-                    images = images[:8]
-                    bboxes = bboxes[:8]
-                    env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
-                    plots = self.predict(env)
-
-                    metrics["trajectories"] = wandb.Image(plots)
+                    plots = self.get_predictions(train_iter)
+                    metrics["trajectories/train"] = wandb.Image(plots)
+                    plots = self.get_predictions(test_iter)
+                    metrics["trajectories/test"] = wandb.Image(plots)
 
                 run.log(metrics)
 
+    def get_predictions(
+        self, iter_loader: Iterator, n_predictions: int = 8
+    ) -> torch.Tensor:
+        """Sample from the loader and make predictions on the sampled images."""
+        images, bboxes = next(iter_loader)
+        images = images.to(self.device)
+        images = images[:n_predictions]
+        bboxes = bboxes[:n_predictions]
+        env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+        plots = self.predict(env)
+        return plots
+
     @torch.no_grad()
     def predict(self, env: NeedleEnv) -> torch.Tensor:
-        """Evaluate the model on a batch of images.
+        """Evaluates the model on a batch of images.
         Return a plot of its trajectories on all images.
 
         ---
@@ -150,8 +184,7 @@ class Reinforce:
 
         for step_id in range(env.max_ep_len):
             logits, memory = self.model(patches, memory)
-            categorical = Categorical(logits=logits)
-            actions = categorical.sample()
+            actions = logits.argmax(dim=1)  # Greedy policy.
 
             patches, _, _, _, infos = env.step(actions)
             positions[:, step_id + 1] = infos["positions"]
