@@ -46,39 +46,41 @@ def test_parse_bboxes():
     # Simple case: only one bbox per image, in a single patch.
     bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    bboxes, bbox_masks = env.parse_bboxes(bboxes)
 
-    assert env.bboxes.shape == torch.Size(
+    assert bboxes.shape == torch.Size(
         [batch_size, env.n_vertical_patches, env.n_horizontal_patches, 1, 4]
     )
-    assert env.bbox_masks.shape == torch.Size(
+    assert bbox_masks.shape == torch.Size(
         [batch_size, env.n_vertical_patches, env.n_horizontal_patches, 1]
     )
 
     # The bboxes should all be located in the first patch only.
-    assert torch.all(env.bbox_masks[:, 0, 0, 0] == 1)
-    assert torch.all(env.bbox_masks[:, 1:, :, :] == 0)
-    assert torch.all(env.bbox_masks[:, :, 1:, :] == 0)
+    assert torch.all(bbox_masks[:, 0, 0, 0] == 1)
+    assert torch.all(bbox_masks[:, 1:, :, :] == 0)
+    assert torch.all(bbox_masks[:, :, 1:, :] == 0)
 
     # The bboxes should remain unchanged.
-    assert torch.all(env.bboxes[:, 0, 0, 0] == torch.FloatTensor([0, 0, 20, 30]))
+    assert torch.all(bboxes[:, 0, 0, 0] == torch.FloatTensor([0, 0, 20, 30]))
 
     # Harder case: One bbox per image, in multiple patches.
     bboxes = [torch.LongTensor([[10, 5, 120, 130]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    bboxes, bbox_masks = env.parse_bboxes(bboxes)
 
     # Make sure the bbox is well located across the patches.
-    assert torch.all(env.bbox_masks[:, 0, 0, 0] == 1)
-    assert torch.all(env.bbox_masks[:, 1, 0, 0] == 1)
-    assert torch.all(env.bbox_masks[:, 0, 1, 0] == 1)
-    assert torch.all(env.bbox_masks[:, 1, 1, 0] == 1)
-    assert torch.all(env.bbox_masks[:, 2:, :, :] == 0)
-    assert torch.all(env.bbox_masks[:, :, 2:, :] == 0)
+    assert torch.all(bbox_masks[:, 0, 0, 0] == 1)
+    assert torch.all(bbox_masks[:, 1, 0, 0] == 1)
+    assert torch.all(bbox_masks[:, 0, 1, 0] == 1)
+    assert torch.all(bbox_masks[:, 1, 1, 0] == 1)
+    assert torch.all(bbox_masks[:, 2:, :, :] == 0)
+    assert torch.all(bbox_masks[:, :, 2:, :] == 0)
 
     # Make sure the bbox is cut to remain in the patches.
-    assert torch.all(env.bboxes[:, 0, 0, 0] == torch.FloatTensor([10, 5, 99, 99]))
-    assert torch.all(env.bboxes[:, 1, 0, 0] == torch.FloatTensor([10, 0, 99, 30]))
-    assert torch.all(env.bboxes[:, 0, 1, 0] == torch.FloatTensor([0, 5, 20, 99]))
-    assert torch.all(env.bboxes[:, 1, 1, 0] == torch.FloatTensor([0, 0, 20, 30]))
+    assert torch.all(bboxes[:, 0, 0, 0] == torch.FloatTensor([10, 5, 99, 99]))
+    assert torch.all(bboxes[:, 1, 0, 0] == torch.FloatTensor([10, 0, 99, 30]))
+    assert torch.all(bboxes[:, 0, 1, 0] == torch.FloatTensor([0, 5, 20, 99]))
+    assert torch.all(bboxes[:, 1, 1, 0] == torch.FloatTensor([0, 0, 20, 30]))
 
 
 @pytest.mark.parametrize(
@@ -222,3 +224,29 @@ def test_closest_bbox_coord_and_best_actions():
         [Action.LEFT_DOWN.value, Action.LEFT.value, Action.LEFT_UP.value]
     )
     assert torch.all(env.best_actions == best_actions)
+
+
+def test_convert_bboxes_to_masks():
+    batch_size = 10
+    width, height = 500, 500
+    patch_size = 100
+    max_ep_len = 10
+    images = torch.randn(batch_size, 3, height, width)
+
+    # Simple case: only one bbox per image, in a single patch.
+    bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
+    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+
+    masks = env.convert_bboxes_to_masks(bboxes)
+    _, parsed_masks = env.parse_bboxes(bboxes)
+    parsed_masks = parsed_masks.max(dim=-1).values
+    assert torch.all(masks == parsed_masks)
+
+    # Harder case: One bbox per image, in multiple patches.
+    bboxes = [torch.LongTensor([[10, 5, 120, 130]]) for _ in range(batch_size)]
+    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+
+    masks = env.convert_bboxes_to_masks(bboxes)
+    _, parsed_masks = env.parse_bboxes(bboxes)
+    parsed_masks = parsed_masks.max(dim=-1).values
+    assert torch.all(masks == parsed_masks)

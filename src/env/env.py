@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import NamedTuple
 
 import einops
 import gymnasium as gym
@@ -82,8 +81,8 @@ class NeedleEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(len(Action))
 
         # Bounding boxes of the images.
-        self.bboxes, self.bbox_masks = self.parse_bboxes(bboxes)
-        self.original_bboxes = bboxes
+        self.bbox_masks = self.convert_bboxes_to_masks(bboxes)
+        self.bboxes = bboxes
 
         # Initialize some variables for the environment.
         self.init_env_variables()
@@ -116,25 +115,6 @@ class NeedleEnv(gym.Env):
             device=self.device,
         )
 
-    def get_infos(self) -> dict[str, Tensor]:
-        """Returns some contextual information about the environment.
-
-        ---
-        Returns:
-            A dictionary of information.
-            Content:
-                positions: The positions of the agents.
-                    Shape of [batch_size, 2].
-                percentages: The percentage of patches found.
-                    Shape of [batch_size,].
-        """
-        at_least_one_bbox = self.bbox_masks.max(dim=-1).values
-        percentages = self.scores / at_least_one_bbox.sum(dim=(1, 2))
-        return {
-            "positions": self.positions,
-            "percentages": percentages,
-        }
-
     def reset(self) -> tuple[Tensor, dict]:
         """Reset the environment variables.
         Randomly initialize the positions of the agents.
@@ -154,7 +134,19 @@ class NeedleEnv(gym.Env):
         )
         self.visited_patches = self.visited_patches | self.tiles_reached
         self.terminated = self.scores == self.max_scores
-        return self.patches, self.get_infos()
+
+        percentages = self.scores / self.bbox_masks.sum(dim=(1, 2))
+        infos = {
+            "positions": self.positions,
+            "delta": torch.zeros_like(
+                percentages, dtype=torch.float, device=self.device
+            ),
+            "just_finished": torch.zeros_like(
+                percentages, dtype=torch.bool, device=self.device
+            ),
+            "percentages": percentages,
+        }
+        return self.patches, infos
 
     @torch.no_grad()
     def step(self, actions: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, dict]:
@@ -198,8 +190,7 @@ class NeedleEnv(gym.Env):
 
         rewards = delta_rewards + 0 * finishing_reward
 
-        at_least_one_bbox = self.bbox_masks.max(dim=-1).values
-        percentages = new_scores / at_least_one_bbox.sum(dim=(1, 2))
+        percentages = new_scores / self.bbox_masks.sum(dim=(1, 2))
 
         infos = {
             "positions": self.positions,
@@ -323,15 +314,14 @@ class NeedleEnv(gym.Env):
                 Shape of [batch_size,].
         """
         # Logical "OR" on the `n_bboxes` dimension.
-        at_least_one_bbox = self.bbox_masks.max(dim=-1).values
-        visited_bboxes = at_least_one_bbox & self.visited_patches
+        visited_bboxes = self.bbox_masks & self.visited_patches
         scores = visited_bboxes.sum(dim=(1, 2))
         return scores
 
     @property
     def max_scores(self) -> Tensor:
         """Compute the maximum possible score of each agent."""
-        return self.bbox_masks.max(dim=-1).values.sum(dim=(1, 2))
+        return self.bbox_masks.sum(dim=(1, 2))
 
     @property
     def closest_bbox_coord(self) -> Tensor:
@@ -343,8 +333,8 @@ class NeedleEnv(gym.Env):
             The closest bbox coordinates.
                 Shape of [batch_size, 2].
         """
-        visited_bboxes = self.bbox_masks.max(dim=-1).values & self.visited_patches
-        nonvisited_bboxes = self.bbox_masks.max(dim=-1).values & ~visited_bboxes
+        visited_bboxes = self.bbox_masks & self.visited_patches
+        nonvisited_bboxes = self.bbox_masks & ~visited_bboxes
 
         # Build a map of coordinates to compute the distances.
         # It is of shape [n_vertical_patches, n_horizontal_patches, 2].
@@ -481,10 +471,49 @@ class NeedleEnv(gym.Env):
 
         return sample
 
+    def convert_bboxes_to_masks(self, bboxes: list[Tensor]) -> Tensor:
+        """Convert the bounding boxes to masks.
+
+        ---
+        Args:
+            bboxes: The bounding boxes of the batch.
+                List of length `batch_size`, where each element is
+                a tensor of shape [n_bboxes, 4].
+
+        ---
+        Returns:
+            masks: The masks of the bounding boxes, to know which patch
+                contains at least a bounding box.
+                Shape of [batch_size, n_vertical_patches, n_horizontal_patches].
+        """
+        masks = torch.zeros(
+            (
+                self.batch_size,
+                self.height,
+                self.width,
+            ),
+            dtype=torch.float32,  # MaxPool2d does not support bool.
+            device=self.device,
+        )
+
+        # There could be a faster way to do this...
+        for batch_id, bboxes_ in enumerate(bboxes):
+            for bbox in bboxes_:
+                masks[batch_id, bbox[1] : bbox[3], bbox[0] : bbox[2]] = 1
+
+        # Logical OR of the masks, to reduce to the patch dimensions.
+        masks = torch.nn.functional.max_pool2d(masks, self.patch_size)
+        return masks.bool()
+
     def parse_bboxes(self, bboxes: list[Tensor]) -> tuple[Tensor, Tensor]:
         """Return the bounding boxes of the images as a tensor.
         Each bounding box of an image is given an id, which will serve as an
         index in the dimension `n_bboxes` of the tensors.
+
+        This implementation is slow and not necessary.
+        It keeps the original bboxes in the patches, which can be useful
+        if you want to train a detector. Since the goal of the agent is only
+        to find the patches where there are bounding boxes, it is not necessary.
 
         ---
         Args:

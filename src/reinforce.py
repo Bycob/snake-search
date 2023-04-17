@@ -1,11 +1,12 @@
 from typing import Any, Iterator
 
 import torch
-import wandb
 from torch.distributions import Categorical
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+import wandb
 
 from .env import NeedleEnv
 from .model import GRUPolicy
@@ -234,7 +235,7 @@ class Reinforce:
         images = [
             plot_trajectory(image, pos[mask], env.patch_size, bboxes)
             for image, pos, mask, bboxes in zip(
-                env.images, positions, masks, env.original_bboxes
+                env.images, positions, masks, env.bboxes
             )
         ]
         images = torch.stack(images, dim=0)
