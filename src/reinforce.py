@@ -177,7 +177,7 @@ class Reinforce:
                 run.log(metrics)
 
     def get_predictions(
-        self, iter_loader: Iterator, n_predictions: int = 12
+        self, iter_loader: Iterator, n_predictions: int = 16
     ) -> torch.Tensor:
         """Sample from the loader and make predictions on the sampled images."""
         images, bboxes = next(iter_loader)

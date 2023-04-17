@@ -1,15 +1,15 @@
-group: Standard Hyperparameters
+group: Big Model
 env:
   patch_size: 32
   max_ep_len: 10
 data:
-  batch_size: 64
+  batch_size: 128
   num_workers: 0
 model:
-  n_channels: [3, 5, 10, 25]
+  n_channels: [3, 5, 15, 30]
   kernels: [3, 3, 3]
-  embedding_size: 64
-  gru_hidden_size: 44
+  embedding_size: 75
+  gru_hidden_size: 60
   gru_num_layers: 4
 optimizer:
   learning_rate: 1.0e-4
