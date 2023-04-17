@@ -59,6 +59,7 @@ class GRUPolicy(nn.Module):
     ):
         super().__init__()
 
+        self.action_encoder = nn.Embedding(n_actions, embedding_size)
         self.cnn_encoder = CNNEncoder(n_channels, kernels)
         self.project = nn.Sequential(
             nn.Flatten(start_dim=1),
@@ -73,7 +74,10 @@ class GRUPolicy(nn.Module):
         self.action_head = nn.Linear(gru_hidden_size, n_actions)
 
     def forward(
-        self, x: torch.Tensor, memory: Optional[torch.Tensor] = None
+        self,
+        x: torch.Tensor,
+        actions: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Predict the action to take for each patch in the batch.
         It is a one-step prediction, the memory is used to remember about
@@ -83,6 +87,8 @@ class GRUPolicy(nn.Module):
         Args:
             x: The batch of patches of images.
                 Shape of [batch_size, num_channels, patch_size, patch_size].
+            actions: The previous action taken.
+                Shape of [batch_size,].
             memory: The memory of the previous step.
                 Shape of [gru_num_layers, batch_size, gru_hidden_size].
 
@@ -96,6 +102,9 @@ class GRUPolicy(nn.Module):
         # Project the image to [batch_size, embedding_size].
         x = self.cnn_encoder(x)
         x = self.project(x)
+
+        # Add the action embedding.
+        x = x + self.action_encoder(actions)
 
         # Run the GRU.
         x = x.unsqueeze(0)  # Add a fictive time dimension.

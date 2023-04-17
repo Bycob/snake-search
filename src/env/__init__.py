@@ -1,1 +1,1 @@
-from .env import BBox, NeedleEnv, Position
+from .env import NeedleEnv

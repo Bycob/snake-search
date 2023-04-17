@@ -32,16 +32,12 @@ MOVES = [
     Action.RIGHT_DOWN,
 ]
 
-# Some useful tuples.
-Position = NamedTuple("Position", [("y", int), ("x", int)])
-BBox = NamedTuple("BBox", [("up_left", Position), ("bottom_right", Position)])
-
 
 class NeedleEnv(gym.Env):
     def __init__(
         self,
         images: Tensor,
-        bboxes: list[list[BBox]],
+        bboxes: list[Tensor],
         patch_size: int,
         max_ep_len: int,
     ):
@@ -53,7 +49,7 @@ class NeedleEnv(gym.Env):
                 Shape of [batch_size, n_channels, height, width].
             bboxes: The bounding boxes of the batch.
                 List of length `batch_size`, where each element is
-                a list of bounding boxes.
+                a tensor of shape [n_bboxes, 4].
         """
         assert len(images) == len(bboxes)
         assert len(images.shape) == 4
@@ -200,7 +196,7 @@ class NeedleEnv(gym.Env):
         just_finished = self.terminated & (delta_rewards != 0)
         finishing_reward.masked_fill_(~just_finished, 0)
 
-        rewards = delta_rewards + finishing_reward
+        rewards = delta_rewards + 0 * finishing_reward
 
         at_least_one_bbox = self.bbox_masks.max(dim=-1).values
         percentages = new_scores / at_least_one_bbox.sum(dim=(1, 2))
@@ -485,7 +481,7 @@ class NeedleEnv(gym.Env):
 
         return sample
 
-    def parse_bboxes(self, bboxes: list[list[BBox]]) -> tuple[Tensor, Tensor]:
+    def parse_bboxes(self, bboxes: list[Tensor]) -> tuple[Tensor, Tensor]:
         """Return the bounding boxes of the images as a tensor.
         Each bounding box of an image is given an id, which will serve as an
         index in the dimension `n_bboxes` of the tensors.
@@ -494,7 +490,7 @@ class NeedleEnv(gym.Env):
         Args:
             bboxes: The bounding boxes of the batch.
                 List of length `batch_size`, where each element is
-                a list of bounding boxes.
+                a tensor of shape [n_bboxes, 4].
 
         ---
         Returns:
@@ -504,7 +500,7 @@ class NeedleEnv(gym.Env):
                 at the `n_bboxes` dimension.
                 Shape of [batch_size, n_vertical_patches, n_horizontal_patches, n_bboxes].
         """
-        n_bboxes = max([len(bboxes_) for bboxes_ in bboxes])
+        n_bboxes = max([bboxes_.shape[0] for bboxes_ in bboxes])
         tensor_bboxes = torch.zeros(
             (
                 self.batch_size,
@@ -513,7 +509,7 @@ class NeedleEnv(gym.Env):
                 n_bboxes,
                 4,
             ),
-            dtype=torch.float,
+            dtype=torch.long,
             device=self.device,
         )
         masks = torch.zeros(
@@ -528,7 +524,7 @@ class NeedleEnv(gym.Env):
         )
 
         def place_bbox_recursive(
-            bbox: BBox,
+            bbox: Tensor,
             bbox_id: int,
             bboxes: Tensor,
             masks: Tensor,
@@ -539,21 +535,21 @@ class NeedleEnv(gym.Env):
             across the patches, by recursively calling this function.
             """
             # Compute the coordinates of the bounding box inside the patch.
-            x1 = bbox.up_left.x % patch_size
-            y1 = bbox.up_left.y % patch_size
-            x2 = x1 + (bbox.bottom_right.x - bbox.up_left.x)
-            y2 = y1 + (bbox.bottom_right.y - bbox.up_left.y)
+            x1 = bbox[0] % patch_size
+            y1 = bbox[1] % patch_size
+            x2 = x1 + (bbox[2] - bbox[0])
+            y2 = y1 + (bbox[3] - bbox[1])
 
             # Compute the coordinates of the patch.
-            patch_x = bbox.up_left.x // patch_size
-            patch_y = bbox.up_left.y // patch_size
+            patch_x = bbox[0] // patch_size
+            patch_y = bbox[1] // patch_size
 
             # Make sure the bounding box does not go outside the patch.
-            x2_clampled = min(x2, patch_size - 1)
-            y2_clampled = min(y2, patch_size - 1)
+            x2_clampled = torch.clamp(x2, max=patch_size - 1)
+            y2_clampled = torch.clamp(y2, max=patch_size - 1)
 
             # Save the bounding box.
-            bboxes[patch_y, patch_x, bbox_id] = torch.FloatTensor(
+            bboxes[patch_y, patch_x, bbox_id] = torch.LongTensor(
                 [x1, y1, x2_clampled, y2_clampled]
             ).to(bboxes.device)
             masks[patch_y, patch_x, bbox_id] = True
@@ -562,31 +558,37 @@ class NeedleEnv(gym.Env):
             # if the bounding box cross the borders of the current patch.
             if x2 - x2_clampled > 0:
                 # The bounding box cross the right border of the patch.
-                n_bbox = BBox(
-                    up_left=Position(x=(patch_x + 1) * patch_size, y=bbox.up_left.y),
-                    bottom_right=Position(
-                        x=bbox.bottom_right.x, y=patch_y * patch_size + y2_clampled
-                    ),
+                n_bbox = torch.LongTensor(
+                    [
+                        (patch_x + 1) * patch_size,
+                        bbox[1],
+                        bbox[2],
+                        patch_y * patch_size + y2_clampled,
+                    ]
                 )
                 place_bbox_recursive(n_bbox, bbox_id, bboxes, masks, patch_size)
 
             if y2 - y2_clampled > 0:
                 # The bounding box cross the bottom border of the patch.
-                n_bbox = BBox(
-                    up_left=Position(x=bbox.up_left.x, y=(patch_y + 1) * patch_size),
-                    bottom_right=Position(
-                        x=patch_x * patch_size + x2_clampled, y=bbox.bottom_right.y
-                    ),
+                n_bbox = torch.LongTensor(
+                    [
+                        bbox[0],
+                        (patch_y + 1) * patch_size,
+                        patch_x * patch_size + x2_clampled,
+                        bbox[3],
+                    ]
                 )
                 place_bbox_recursive(n_bbox, bbox_id, bboxes, masks, patch_size)
 
             if (x2 - x2_clampled > 0) and (y2 - y2_clampled > 0):
                 # The bounding box cross the bottom-right corner of the patch.
-                n_bbox = BBox(
-                    up_left=Position(
-                        x=(patch_x + 1) * patch_size, y=(patch_y + 1) * patch_size
-                    ),
-                    bottom_right=bbox.bottom_right,
+                n_bbox = torch.LongTensor(
+                    [
+                        (patch_x + 1) * patch_size,
+                        (patch_y + 1) * patch_size,
+                        bbox[2],
+                        bbox[3],
+                    ]
                 )
                 place_bbox_recursive(n_bbox, bbox_id, bboxes, masks, patch_size)
 

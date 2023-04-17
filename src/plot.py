@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .env import BBox, Position
-
 
 def plot_image(
     axe: plt.Axes, image: np.ndarray, patch_size: int, cmap: Optional[str] = "gray"
@@ -18,31 +16,28 @@ def plot_image(
     axe.grid(visible=True, color="white")
 
 
-def plot_bbox(axe: plt.Axes, bbox: BBox, color: str = "green"):
-    up_left = bbox.up_left
-    bottom_right = bbox.bottom_right
-
+def plot_bbox(axe: plt.Axes, bbox: np.ndarray, color: str = "green"):
     axe.plot(
-        [up_left.x, up_left.x],
-        [up_left.y, bottom_right.y],
+        [bbox[0], bbox[0]],
+        [bbox[1], bbox[3]],
         color=color,
         alpha=0.6,
     )
     axe.plot(
-        [up_left.x, bottom_right.x],
-        [bottom_right.y, bottom_right.y],
+        [bbox[0], bbox[2]],
+        [bbox[3], bbox[3]],
         color=color,
         alpha=0.6,
     )
     axe.plot(
-        [bottom_right.x, bottom_right.x],
-        [bottom_right.y, up_left.y],
+        [bbox[2], bbox[2]],
+        [bbox[3], bbox[1]],
         color=color,
         alpha=0.6,
     )
     axe.plot(
-        [bottom_right.x, up_left.x],
-        [up_left.y, up_left.y],
+        [bbox[2], bbox[0]],
+        [bbox[1], bbox[1]],
         color=color,
         alpha=0.6,
     )
@@ -51,15 +46,15 @@ def plot_bbox(axe: plt.Axes, bbox: BBox, color: str = "green"):
 def plot_patches(
     axe: plt.Axes,
     patches: np.ndarray,
-    positions: list[Position],
+    positions: np.ndarray,
     height: int,
     width: int,
 ):
-    patch_h, patch_w, n_channels = patches[0].shape
+    _, patch_h, patch_w, n_channels = patches.shape
     image = np.zeros((height, width, n_channels))
     for patch, position in zip(patches, positions):
         image[
-            position.y : position.y + patch_h, position.x : position.x + patch_w
+            position[0] : position[0] + patch_h, position[1] : position[1] + patch_w
         ] = patch
     axe.imshow(image, vmin=0, vmax=1, alpha=0.3)
 
@@ -68,7 +63,7 @@ def plot_trajectory(
     image: torch.Tensor,
     positions: torch.Tensor,
     patch_size: int,
-    bboxes: Optional[list[BBox]] = None,
+    bboxes: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Plot the model predictions onto the image.
     The patches that the model visited are plotted in a progressive red scale.
@@ -99,13 +94,12 @@ def plot_trajectory(
     image = image.transpose(1, 2, 0)
 
     # Parse positions.
-    parsed_positions = [
-        Position(p[0] * patch_size, p[1] * patch_size) for p in positions
-    ]
+    parsed_positions = [[p[0] * patch_size, p[1] * patch_size] for p in positions]
+    parsed_positions = np.array(parsed_positions)
 
     # To progressive gray scale markers.
     markers = np.ones(
-        (len(parsed_positions), patch_size, patch_size, image.shape[2]),
+        (parsed_positions.shape[0], patch_size, patch_size, image.shape[2]),
         dtype=np.float32,
     )
     min_range = 0.3
@@ -123,7 +117,7 @@ def plot_trajectory(
 
     if bboxes is not None:
         for bbox in bboxes:
-            plot_bbox(axe, bbox, color="blue")
+            plot_bbox(axe, bbox.cpu().numpy(), color="blue")
 
     # Get figure data to numpy array.
     canvas = figure.canvas

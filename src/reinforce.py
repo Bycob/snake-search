@@ -62,10 +62,11 @@ class Reinforce:
         )
 
         memory = None
+        actions = torch.zeros((env.batch_size,), dtype=torch.long, device=self.device)
         patches, _ = env.reset()
 
         for step_id in range(env.max_ep_len):
-            logits, memory = self.model(patches, memory)
+            logits, memory = self.model(patches, actions, memory)
             categorical = Categorical(logits=logits)
             actions = categorical.sample()
 
@@ -202,6 +203,7 @@ class Reinforce:
         """
         self.model.eval()
         memory = None
+        actions = torch.zeros((env.batch_size,), dtype=torch.long, device=self.device)
         patches, infos = env.reset()
 
         positions = torch.zeros(
@@ -217,7 +219,7 @@ class Reinforce:
         masks[:, 0] = True
 
         for step_id in range(env.max_ep_len):
-            logits, memory = self.model(patches, memory)
+            logits, memory = self.model(patches, actions, memory)
             actions = logits.argmax(dim=1)  # Greedy policy.
 
             patches, _, terminated, _, infos = env.step(actions)

@@ -70,9 +70,11 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
     )
     image, _ = dataset[0]
     n_channels = image.shape[0]
+    patches = torch.zeros((1, n_channels, config.env.patch_size, config.env.patch_size))
+    actions = torch.zeros((1,), dtype=torch.long)
     summary(
         model,
-        input_size=(1, n_channels, config.env.patch_size, config.env.patch_size),
+        input_data=[patches, actions],
     )
     return model
 

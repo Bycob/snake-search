@@ -5,8 +5,6 @@ from torch.utils.data import Dataset
 from torchvision.datasets import CelebA
 from torchvision.transforms import ToTensor
 
-from .env import BBox, Position
-
 
 class CelebADataset(Dataset):
     """Load the specified split of the CelebA dataset.
@@ -25,7 +23,7 @@ class CelebADataset(Dataset):
         self.transform = ToTensor()
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """Load an image and its right eye landmark.
+        """Load an image and its left eye bounding box.
 
         ---
         Args:
@@ -35,43 +33,41 @@ class CelebADataset(Dataset):
         Returns:
             image: The torch image tensor.
                 Shape of [num_channels, height, width].
-            right_eye: The right eye landmark (tuple (x, y)).
-                Shape of [2,].
+            bboxes: The landmarks as bounding boxes.
+                Shape of [n_bboxes, 4].
         """
         image, landmarks = self.dataset[index]
         image = self.transform(image)
-        right_eye = landmarks[0:2]
-        return image, right_eye
+        landmarks = landmarks.reshape(-1, 2).long()
+        # We only load the left eye landmark.
+        left_eye = landmarks[:1,]
+        bboxes = CelebADataset.landmarks_to_bbox(left_eye, image)
+        return image, bboxes
 
     @staticmethod
-    def landmark_to_bbox(landmark: torch.Tensor, image: torch.Tensor) -> BBox:
-        """Transform a landmark to a bounding box.
+    def landmarks_to_bbox(landmarks: torch.Tensor, image: torch.Tensor) -> torch.Tensor:
+        """Transform landmarks to bounding boxes.
         It does so by taking the landmark as the center of a square and
         adding a margin of 5% of the image size.
 
         ---
         Args:
-            landmark: The right eye landmark (tuple (x, y)).
-                Shape of [2,].
+            landmarks: The left eye landmark (for example) as tuples `(x, y)`.
+                Shape of [n_landmarks, 2].
             image: The torch image tensor.
                 Shape of [num_channels, height, width].
 
         ---
         Returns:
-            The bounding box.
+            The bounding boxes as tuples `(x1, y1, x2, y2)`.
+                Shape of [n_landmarks, 4].
         """
         width = image.shape[2]
         bbox_size = int(0.05 * width)
-        return BBox(
-            up_left=Position(
-                x=landmark[0] - bbox_size // 2,
-                y=landmark[1] - bbox_size // 2,
-            ),
-            bottom_right=Position(
-                x=landmark[0] + bbox_size // 2,
-                y=landmark[1] + bbox_size // 2,
-            ),
-        )
+        bboxes = torch.concat((landmarks, landmarks), dim=1)
+        bboxes[:, :2] -= bbox_size // 2
+        bboxes[:, 2:] += bbox_size // 2
+        return bboxes
 
     def __len__(self):
         return len(self.dataset)
@@ -85,7 +81,7 @@ class NeedleDataset(Dataset):
     def __init__(self, celeb_dataset: CelebADataset):
         self.celeb_dataset = celeb_dataset
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, list[BBox]]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         """Load the celebA image and landmarks and returns
         the image and its landmarks.
 
@@ -98,11 +94,9 @@ class NeedleDataset(Dataset):
             image: The torch image tensor.
                 Shape of [num_channels, height, width].
             bboxes: The list of bounding boxes.
+                Shape of [n_bboxes, 4].
         """
-        image, landmark = self.celeb_dataset[index]
-        bbox = self.celeb_dataset.landmark_to_bbox(landmark, image)
-        # We only load one bbox, at least for now.
-        bboxes = [bbox]
+        image, bboxes = self.celeb_dataset[index]
         return image, bboxes
 
     def __len__(self):
@@ -110,8 +104,8 @@ class NeedleDataset(Dataset):
 
     @staticmethod
     def collate_fn(
-        batch: list[tuple[torch.Tensor, list[BBox]]], patch_size: int
-    ) -> tuple[torch.Tensor, list[list[BBox]]]:
+        batch: list[tuple[torch.Tensor, torch.Tensor]], patch_size: int
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """Collate the batch of images and bboxes.
         The images are stacked in a tensor and the bboxes are stacked in a list.
 
@@ -124,6 +118,13 @@ class NeedleDataset(Dataset):
                 List of tuple (image, bboxes).
             patch_size: The size of the patches, for padding.
 
+        ---
+        Returns:
+            images: The batch of images.
+                Shape of [batch_size, num_channels, height, width].
+            bounding_boxes: The list of bounding boxes.
+                List of length `batch_size`, where each element is
+                a tensor of shape [n_bboxes, 4].
         """
         images, bboxes = [], []
         for image, bbox in batch:

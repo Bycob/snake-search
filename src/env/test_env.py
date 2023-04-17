@@ -7,7 +7,7 @@ import pytest
 import torch
 from torch import Tensor
 
-from .env import Action, BBox, NeedleEnv, Position
+from .env import Action, NeedleEnv
 
 
 @pytest.mark.parametrize(
@@ -44,15 +44,7 @@ def test_parse_bboxes():
     images = torch.randn(batch_size, 3, height, width)
 
     # Simple case: only one bbox per image, in a single patch.
-    bboxes = [
-        [
-            BBox(
-                up_left=Position(x=0, y=0),
-                bottom_right=Position(x=20, y=30),
-            )
-        ]
-        for _ in range(batch_size)
-    ]
+    bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
 
     assert env.bboxes.shape == torch.Size(
@@ -71,15 +63,7 @@ def test_parse_bboxes():
     assert torch.all(env.bboxes[:, 0, 0, 0] == torch.FloatTensor([0, 0, 20, 30]))
 
     # Harder case: One bbox per image, in multiple patches.
-    bboxes = [
-        [
-            BBox(
-                up_left=Position(x=10, y=5),
-                bottom_right=Position(x=120, y=130),
-            )
-        ]
-        for _ in range(batch_size)
-    ]
+    bboxes = [torch.LongTensor([[10, 5, 120, 130]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
 
     # Make sure the bbox is well located across the patches.
@@ -107,15 +91,7 @@ def test_parse_bboxes():
 def test_patches(batch_size: int, width: int, height: int, patch_size: int):
     max_ep_len = 10
     images = torch.randn(batch_size, 3, height, width)
-    bboxes = [
-        [
-            BBox(
-                up_left=Position(x=0, y=0),
-                bottom_right=Position(x=20, y=30),
-            )
-        ]
-        for _ in range(batch_size)
-    ]
+    bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
 
     positions = torch.zeros((batch_size, 2), dtype=torch.long)
@@ -152,15 +128,7 @@ def test_patches(batch_size: int, width: int, height: int, patch_size: int):
 def test_movements(batch_size: int, width: int, height: int, patch_size: int):
     max_ep_len = 10
     images = torch.randn(batch_size, 3, height, width)
-    bboxes = [
-        [
-            BBox(
-                up_left=Position(x=0, y=0),
-                bottom_right=Position(x=20, y=30),
-            )
-        ]
-        for _ in range(batch_size)
-    ]
+    bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
     positions = torch.zeros((batch_size, 2), dtype=torch.long)
     positions[:, 0] = torch.randint(
@@ -194,15 +162,7 @@ def test_tiles_reached():
     patch_size = 10
     max_ep_len = 10
     images = torch.randn(batch_size, 3, height, width)
-    bboxes = [
-        [
-            BBox(
-                up_left=Position(x=0, y=0),
-                bottom_right=Position(x=20, y=29),
-            )
-        ]
-        for _ in range(batch_size)
-    ]
+    bboxes = [torch.LongTensor([[0, 0, 20, 29]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
 
     env.positions = torch.LongTensor(
@@ -227,15 +187,7 @@ def test_closest_bbox_coord_and_best_actions():
     patch_size = 10
     max_ep_len = 10
     images = torch.randn(batch_size, 3, height, width)
-    bboxes = [
-        [
-            BBox(
-                up_left=Position(x=0, y=0),
-                bottom_right=Position(x=5, y=22),
-            ),
-        ]
-        for _ in range(batch_size)
-    ]
+    bboxes = [torch.LongTensor([[0, 0, 5, 22]]) for _ in range(batch_size)]
     env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
 
     # With no visited patches.
