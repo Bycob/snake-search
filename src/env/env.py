@@ -191,11 +191,26 @@ class NeedleEnv(gym.Env):
 
         # Compute the rewards and terminaisons.
         new_scores = self.scores
-        rewards = new_scores - previous_scores
+        delta_rewards = new_scores - previous_scores
         self.terminated |= new_scores == self.max_scores
         truncated = self.steps >= self.max_ep_len
 
-        infos = self.get_infos()
+        # Give a bonus reward for finishing the episode.
+        finishing_reward = self.max_ep_len - self.steps
+        just_finished = self.terminated & (delta_rewards != 0)
+        finishing_reward.masked_fill_(~just_finished, 0)
+
+        rewards = delta_rewards + finishing_reward
+
+        at_least_one_bbox = self.bbox_masks.max(dim=-1).values
+        percentages = new_scores / at_least_one_bbox.sum(dim=(1, 2))
+
+        infos = {
+            "positions": self.positions,
+            "delta": delta_rewards,
+            "just_finished": just_finished,
+            "percentages": percentages,
+        }
 
         return self.patches, rewards, self.terminated, truncated, infos
 

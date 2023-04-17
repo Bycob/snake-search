@@ -44,17 +44,20 @@ class Reinforce:
         Returns the rewards, returns and logprobs of the rollout.
         """
         rewards = torch.zeros(
-            env.batch_size,
-            env.max_ep_len,
+            (env.batch_size, env.max_ep_len),
             device=self.device,
         )
         logprobs = torch.zeros(
-            env.batch_size,
-            env.max_ep_len,
+            (env.batch_size, env.max_ep_len),
+            device=self.device,
+        )
+        masks = torch.zeros(
+            (env.batch_size, env.max_ep_len),
+            dtype=torch.bool,
             device=self.device,
         )
         percentages = torch.zeros(
-            env.batch_size,
+            (env.batch_size,),
             device=self.device,
         )
 
@@ -66,21 +69,34 @@ class Reinforce:
             categorical = Categorical(logits=logits)
             actions = categorical.sample()
 
-            patches, step_rewards, _, _, infos = env.step(actions)
+            patches, step_rewards, terminated, truncated, infos = env.step(actions)
 
             rewards[:, step_id] = step_rewards
             logprobs[:, step_id] = categorical.log_prob(actions)
+            masks[:, step_id] = ~terminated
             percentages = infos["percentages"]
 
+            if torch.all(terminated | truncated):
+                # All environments are done.
+                break
+
+        # The last terminated state is not counted in the masks,
+        # so we need to shift the masks by 1 to make sure we include id.
+        masks = torch.roll(masks, shifts=1, dims=(1,))
+        masks[:, 0] = True
+
         rewards = torch.flip(rewards, dims=(1,))
-        cumulated_returns = torch.cumsum(rewards, dim=1)
+        masks = torch.flip(masks, dims=(1,))
+        cumulated_returns = torch.cumsum(rewards * masks, dim=1)
         cumulated_returns = torch.flip(cumulated_returns, dims=(1,))
         rewards = torch.flip(rewards, dims=(1,))
+        masks = torch.flip(masks, dims=(1,))
 
         return {
             "rewards": rewards,
             "returns": cumulated_returns,
             "logprobs": logprobs,
+            "masks": masks,
             "percentages": percentages,
         }
 
@@ -99,13 +115,17 @@ class Reinforce:
         """
         metrics = dict()
         returns = rollout["returns"]
+        masks = rollout["masks"]
 
         advantages = (returns - returns.mean(dim=0, keepdim=True)) / (
             returns.std(dim=0, keepdim=True) + 1e-8
         )
-        metrics["loss"] = -(rollout["logprobs"] * advantages).sum(dim=1).mean()
-        metrics["returns"] = rollout["rewards"].sum(dim=1).mean()
+        metrics["loss"] = (
+            -(rollout["logprobs"] * advantages * masks).sum() / masks.sum()
+        )
+        metrics["returns"] = (rollout["rewards"] * masks).sum(dim=1).mean()
         metrics["percentages"] = rollout["percentages"].mean()
+        metrics["episode-length"] = masks.sum(dim=1).float().mean()
         return metrics
 
     def launch_training(self, group: str, config: dict[str, Any]):
@@ -155,7 +175,7 @@ class Reinforce:
                 run.log(metrics)
 
     def get_predictions(
-        self, iter_loader: Iterator, n_predictions: int = 8
+        self, iter_loader: Iterator, n_predictions: int = 12
     ) -> torch.Tensor:
         """Sample from the loader and make predictions on the sampled images."""
         images, bboxes = next(iter_loader)
@@ -189,16 +209,31 @@ class Reinforce:
         )
         positions[:, 0] = infos["positions"]
 
+        masks = torch.zeros(
+            (env.batch_size, env.max_ep_len + 1),
+            dtype=torch.bool,
+            device=self.device,
+        )
+        masks[:, 0] = True
+
         for step_id in range(env.max_ep_len):
             logits, memory = self.model(patches, memory)
             actions = logits.argmax(dim=1)  # Greedy policy.
 
-            patches, _, _, _, infos = env.step(actions)
+            patches, _, terminated, _, infos = env.step(actions)
             positions[:, step_id + 1] = infos["positions"]
+            masks[:, step_id + 1] = ~terminated
+
+        # The last terminated state is not counted in the masks,
+        # so we need to shift the masks by 1 to make sure we include id.
+        masks = torch.roll(masks, shifts=1, dims=(1,))
+        masks[:, 0] = True
 
         images = [
-            plot_trajectory(image, pos, env.patch_size, bboxes)
-            for image, pos, bboxes in zip(env.images, positions, env.original_bboxes)
+            plot_trajectory(image, pos[mask], env.patch_size, bboxes)
+            for image, pos, mask, bboxes in zip(
+                env.images, positions, masks, env.original_bboxes
+            )
         ]
         images = torch.stack(images, dim=0)
         return images
