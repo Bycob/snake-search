@@ -143,6 +143,9 @@ class Reinforce:
             config: A dictionary of hyperparameters.
         """
         print(f"Launching REINFORCE on device {self.device}")
+        print(f"Training dataset size: {len(self.train_loader.dataset):,}")
+        print(f"Test dataset size: {len(self.test_loader.dataset):,}")
+
         self.model.to(self.device)
 
         train_iter = iter(self.train_loader)

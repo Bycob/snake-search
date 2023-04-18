@@ -41,6 +41,11 @@ def prepare_LARD(lard_directory: Path):
         bbox_filename = bbox_directory / bbox_filename.with_suffix(".txt")
         image_filename = lard_directory / image
 
+        if not image_filename.exists():
+            # Ignore images that don't exist.
+            # They may not be unzipped!
+            continue
+
         bbox_filename = bbox_filename.absolute()
         image_filename = image_filename.absolute()
 
@@ -56,5 +61,5 @@ def prepare_LARD(lard_directory: Path):
 
 
 if __name__ == "__main__":
-    PATH_TO_LARD = Path("./.data/LARD/lard_dataset/lard/1.0.0/")
+    PATH_TO_LARD = Path("./.data/lard_dataset/lard/1.0.0/")
     prepare_LARD(PATH_TO_LARD)
