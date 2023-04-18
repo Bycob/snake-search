@@ -9,8 +9,8 @@ The expected format is:
 from pathlib import Path
 
 import torch
-from kornia.io import ImageLoadType, load_image
 from torch.utils.data import Dataset, random_split
+from torchvision.io import ImageReadMode, read_image
 
 
 class StandardDataset(Dataset):
@@ -22,7 +22,7 @@ class StandardDataset(Dataset):
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         # Load image from disk.
-        image = load_image(str(self.images[index]), ImageLoadType.RGB32, "cpu")
+        image = read_image(str(self.images[index]), ImageReadMode.RGB).float() / 255
         bboxes = StandardDataset.read_bbox(self.annotations[index])
         return image, bboxes
 
@@ -69,12 +69,12 @@ class StandardDataset(Dataset):
         the two datasets.
         """
         if (dir_path / "train.txt").exists() and (dir_path / "test.txt").exists():
-            train_dataset = StandardDataset.load_from_file(dir_path / "train.txt")
-            test_dataset = StandardDataset.load_from_file(dir_path / "test.txt")
+            train_dataset = cls.load_from_file(dir_path / "train.txt")
+            test_dataset = cls.load_from_file(dir_path / "test.txt")
             return train_dataset, test_dataset
 
         if (dir_path / "all.txt").exists():
-            dataset = StandardDataset.load_from_file(dir_path / "all.txt")
+            dataset = cls.load_from_file(dir_path / "all.txt")
             train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
             return train_dataset, test_dataset
 
