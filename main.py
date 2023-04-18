@@ -10,28 +10,46 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler
 from torchinfo import summary
 
-from src.dataset import CelebADataset, NeedleDataset
+from src.dataset import CelebADataset, NeedleDataset, StandardDataset
 from src.model import GRUPolicy
 from src.reinforce import Reinforce
 
 
-def init_datasets() -> tuple[NeedleDataset, NeedleDataset]:
+def init_celeba_datasets(config: DictConfig) -> tuple[CelebADataset, CelebADataset]:
+    # Make sure the data is downloaded to the same location every runs.
+    root_path = Path(to_absolute_path(config.data.path))
+    train_dataset = CelebADataset("train", root_path)
+    test_dataset = CelebADataset("test", root_path)
+    return train_dataset, test_dataset
+
+
+def init_standard_datasets(config: DictConfig) -> tuple[StandardDataset, NeedleDataset]:
+    root_path = Path(to_absolute_path(config.data.path))
+    train_dataset, test_dataset = StandardDataset.load_from_dir(root_path)
+    return train_dataset, test_dataset
+
+def init_datasets(config: DictConfig) -> tuple[NeedleDataset, NeedleDataset]:
     """Initialize the train and test datasets.
+
+    ---
+    Args:
+    config: The Hydra configuration.
 
     ---
     Returns:
         train_dataset: The train dataset.
         test_dataset: The test dataset.
     """
-    # Make sure the data is downloaded to the same location every runs.
-    root_path = Path(to_absolute_path("./.data/"))
+    match config.data.dataset:
+        case "celeba":
+            train_dataset, test_dataset = init_celeba_datasets(config)
+        case "standard":
+            train_dataset, test_dataset = init_standard_datasets(config)
+        case _:
+            raise ValueError(f"Unknown dataset: {config.data.dataset}")
 
-    celeb_dataset = CelebADataset("train", root_path)
-    train_dataset = NeedleDataset(celeb_dataset)
-
-    celeb_dataset = CelebADataset("test", root_path)
-    test_dataset = NeedleDataset(celeb_dataset)
-
+    train_dataset = NeedleDataset(train_dataset)
+    test_dataset = NeedleDataset(test_dataset)
     return train_dataset, test_dataset
 
 
@@ -89,7 +107,7 @@ def main(config: DictConfig):
     if config.device == "auto":
         config.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    train_dataset, test_dataset = init_datasets()
+    train_dataset, test_dataset = init_datasets(config)
     train_lodaer, test_loader = init_dataloaders(config, train_dataset, test_dataset)
     model = init_model(config, train_dataset)
     optimizer = init_optimizer(config, model)

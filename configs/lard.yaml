@@ -1,12 +1,12 @@
-group: CelebA
+group: LARD
 env:
-  patch_size: 32
-  max_ep_len: 10
+  patch_size: 224
+  max_ep_len: 20
 data:
-  batch_size: 64
-  num_workers: 0
-  dataset: celeba
-  path: ./.data
+  batch_size: 32
+  num_workers: 4
+  dataset: standard
+  path: /data1/pierrep/jolineedle/runway_LARD/
 model:
   n_channels: [3, 5, 10, 25]
   kernels: [3, 3, 3]
