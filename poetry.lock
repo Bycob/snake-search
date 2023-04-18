@@ -591,6 +591,62 @@ files = [
 ]
 
 [[package]]
+name = "kornia"
+version = "0.6.11"
+description = "Open Source Differentiable Computer Vision Library for PyTorch"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "kornia-0.6.11-py2.py3-none-any.whl", hash = "sha256:97bf856ab36ddac8dd249a359da34875aaf7d960b308c50f14d69d62053bf5a2"},
+    {file = "kornia-0.6.11.tar.gz", hash = "sha256:ba77198f2c2e4044c87e4503ff277aadbfc0db20495da5a5289663f380b4be32"},
+]
+
+[package.dependencies]
+packaging = "*"
+torch = ">=1.9.1"
+
+[package.extras]
+dev = ["isort", "kornia-rs (==0.0.8)", "mypy[reports]", "numpy", "opencv-python", "pre-commit (>=2)", "pydocstyle", "pytest (==7.2.2)", "pytest-cov (==4)", "scipy"]
+docs = ["PyYAML (>=5.1)", "furo", "kornia-moons", "matplotlib", "opencv-python", "sphinx (>=4)", "sphinx-autodoc-defaultargs", "sphinx-autodoc-typehints", "sphinx-copybutton (>=0.3)", "sphinx-design", "sphinxcontrib-bibtex", "sphinxcontrib-gtagjs", "sphinxcontrib-youtube", "torchvision"]
+x = ["accelerate (==0.18.0)"]
+
+[[package]]
+name = "kornia-rs"
+version = "0.0.8"
+description = "Low level implementations for computer vision in Rust"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "kornia_rs-0.0.8-cp310-cp310-macosx_10_7_x86_64.whl", hash = "sha256:9e3ec471a1ab2fecbdec2ce75cc77be9755237ded75fa82fc8a19e7ae4fa478e"},
+    {file = "kornia_rs-0.0.8-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c3cdbd17bc66042cddc66c015f9dbae96695abea14068d8249385e48314a009a"},
+    {file = "kornia_rs-0.0.8-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d8df027cabb442c39a49db97efcfc76cb4f32edabe4929889a6ecdae5d010eef"},
+    {file = "kornia_rs-0.0.8-cp310-none-win_amd64.whl", hash = "sha256:735a512441e6d7e21d6270a8ac322d3f3a580bc2882be8a0dbc01aabe7393e69"},
+    {file = "kornia_rs-0.0.8-cp311-cp311-macosx_10_7_x86_64.whl", hash = "sha256:e195910ec6139c2436996f62076a6e64e86388e686321656fc174b744a1f0d85"},
+    {file = "kornia_rs-0.0.8-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:de19c0bbf90a4c9fd5443e6902b292cd8d4d0c5d01babfad73d6a0618694a2d9"},
+    {file = "kornia_rs-0.0.8-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e748421465827b10b7b54a1f566d44a423abd87016ca85f95841726578ad56a7"},
+    {file = "kornia_rs-0.0.8-cp311-none-win_amd64.whl", hash = "sha256:e0384bc24518525769dfb1ffa2347a40148e559822aff89dee1ce3cd6ac29df0"},
+    {file = "kornia_rs-0.0.8-cp37-cp37m-macosx_10_7_x86_64.whl", hash = "sha256:5960e586efb3b04defe4238734d1170bc79a6e38107a2d13627155c116becf12"},
+    {file = "kornia_rs-0.0.8-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9a79f15868bea2a546e3ddc16f863498ce91bb312391290675ed0dfd645e54ec"},
+    {file = "kornia_rs-0.0.8-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:52adb6b062cb5fbc5f45a8aa3af0219c8df17bad6fe735aecc6ae45eeaf1c1ee"},
+    {file = "kornia_rs-0.0.8-cp37-none-win_amd64.whl", hash = "sha256:84f78c2ddb1f17ee0ffd5fb2cd0a27415cf5a844b51602142c933473dd78f54a"},
+    {file = "kornia_rs-0.0.8-cp38-cp38-macosx_10_7_x86_64.whl", hash = "sha256:30dc55ec390d5ebf949a8243346cc95c07a0ce776c0da01b3d25ce7efaf8ffad"},
+    {file = "kornia_rs-0.0.8-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:8ab8e5de1f8839b69b3ab675d5e9a250d240ae6540bc51cafa2ca4fc53169fbd"},
+    {file = "kornia_rs-0.0.8-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e2d1ebee784b33b7d27afbf473fb0fb4f97e52872b3dd7814e9e0c1c1e97f169"},
+    {file = "kornia_rs-0.0.8-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bdfc529327a2fdc3091cc14c52f24e19fa1f158f841eba651c9eda843b2a89d0"},
+    {file = "kornia_rs-0.0.8-cp38-none-win_amd64.whl", hash = "sha256:a4b8243f72a7fe801155f0a874c0a7cf60b6d59de0dd900174068c53a902e9f7"},
+    {file = "kornia_rs-0.0.8-cp39-cp39-macosx_10_7_x86_64.whl", hash = "sha256:2ef18e70e3ef9a4d746c9c1fae1e61992bd33286a1937e67cc103935792c1220"},
+    {file = "kornia_rs-0.0.8-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:1b61b75689c128c97ab0a0d6af6cae1ab4b59e05e33dfdb18790f557547ad44b"},
+    {file = "kornia_rs-0.0.8-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d6a36c0eafcfd0bfcd4755e54000857be3af1b2163ee103c5cc64d96b53f17be"},
+    {file = "kornia_rs-0.0.8-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:340e8d504c824321cf8a2598abdf1399a3a559f3cd9e2468f0ad374ba45ec369"},
+    {file = "kornia_rs-0.0.8-cp39-none-win_amd64.whl", hash = "sha256:a21bd3ed364da55829a07a25c067935a6c571302e95b0eec371f34ce73a1df80"},
+]
+
+[package.extras]
+dev = ["jax[cpu]", "kornia (==0.6.3)", "numpy (==1.23.0)", "pytest", "pytest-asyncio"]
+
+[[package]]
 name = "lit"
 version = "16.0.1"
 description = "A Software Testing Tool"
@@ -1101,26 +1157,6 @@ files = [
 [package.extras]
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
-
-[[package]]
-name = "positional-encodings"
-version = "6.0.1"
-description = "1D, 2D, and 3D Sinusodal Positional Encodings in PyTorch"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "positional_encodings-6.0.1-py3-none-any.whl", hash = "sha256:0675bdbe5d50e95bb43348c5fd234311e4b0a253474a30da89348949ad42c306"},
-    {file = "positional_encodings-6.0.1.tar.gz", hash = "sha256:01de4b788b7517cb22ba816974f9881e2901b5b1f83ef16476f18d2a1a4a9ce2"},
-]
-
-[package.dependencies]
-numpy = "*"
-torch = {version = "*", optional = true, markers = "extra == \"pytorch\""}
-
-[package.extras]
-pytorch = ["torch"]
-tensorflow = ["tensorflow"]
 
 [[package]]
 name = "protobuf"
@@ -1743,4 +1779,4 @@ test = ["pytest (>=6.0.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "850faa9c2aea0762a5a3083f981527cb3a63e82112d27f8f6574bd35c55ea822"
+content-hash = "774a5216fd324b6dee5f0eaea2b39319e8cc2a93aed11a2a66088b10351843d3"
