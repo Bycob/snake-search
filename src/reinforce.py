@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any, Iterator
 
 import torch
@@ -27,6 +28,7 @@ class Reinforce:
         patch_size: int,
         max_ep_len: int,
         n_iterations: int,
+        log_every: int,
         plot_every: int,
         device: str,
     ):
@@ -37,6 +39,7 @@ class Reinforce:
         self.patch_size = patch_size
         self.max_ep_len = max_ep_len
         self.n_iterations = n_iterations
+        self.log_every = log_every
         self.plot_every = plot_every
         self.device = device
 
@@ -167,6 +170,16 @@ class Reinforce:
                 metrics["loss"].backward()
                 self.optimizer.step()
 
+                metrics = dict()
+                if step_id % self.log_every == 0:
+                    for loader, name in [
+                        (self.train_loader, "train"),
+                        (self.test_loader, "test"),
+                    ]:
+                        loader_metrics = self.test_model(loader, 10)
+                        for key, value in loader_metrics.items():
+                            metrics[f"{name}/{key}"] = value
+
                 if step_id % self.plot_every == 0:
                     # Log the trajectories on a batch of images.
                     plots = self.get_predictions(train_iter)
@@ -174,7 +187,27 @@ class Reinforce:
                     plots = self.get_predictions(test_iter)
                     metrics["trajectories/test"] = wandb.Image(plots)
 
-                run.log(metrics)
+                if metrics:
+                    run.log(metrics)
+
+    @torch.no_grad()
+    def test_model(self, loader: DataLoader, n_iters: int) -> dict[str, torch.Tensor]:
+        """Test the model on the given loader, returns the computed metrics."""
+        self.model.eval()
+        all_metrics = defaultdict(list)
+        for _ in range(n_iters):
+            images, bboxes = next(iter(loader))
+            images = images.to(self.device)
+
+            env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+
+            rollout = self.rollout(env)
+            metrics = self.compute_metrics(rollout)
+
+            for key, value in metrics.items():
+                all_metrics[key].append(value.cpu())
+
+        return {key: torch.stack(values).mean() for key, values in all_metrics.items()}
 
     def get_predictions(
         self, iter_loader: Iterator, n_predictions: int = 16

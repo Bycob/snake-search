@@ -28,6 +28,7 @@ def init_standard_datasets(config: DictConfig) -> tuple[StandardDataset, NeedleD
     train_dataset, test_dataset = StandardDataset.load_from_dir(root_path)
     return train_dataset, test_dataset
 
+
 def init_datasets(config: DictConfig) -> tuple[NeedleDataset, NeedleDataset]:
     """Initialize the train and test datasets.
 
@@ -119,6 +120,7 @@ def main(config: DictConfig):
         patch_size=config.env.patch_size,
         max_ep_len=config.env.max_ep_len,
         n_iterations=config.reinforce.n_iterations,
+        log_every=config.reinforce.log_every,
         plot_every=config.reinforce.plot_every,
         device=config.device,
     )
