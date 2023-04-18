@@ -2,4 +2,6 @@
 .venv/
 .pytest_cache/
 outputs/
+wandb/
+poetry.lock
 **/__pycache__/
