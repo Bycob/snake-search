@@ -3,7 +3,7 @@ env:
   patch_size: 224
   max_ep_len: 40
 data:
-  batch_size: 32
+  batch_size: 8
   num_workers: 2
   dataset: standard
   path: ./.data/lard_dataset/lard/1.0.0/
