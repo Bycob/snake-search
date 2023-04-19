@@ -5,7 +5,7 @@ import torch.nn as nn
 
 
 class CNNEncoder(nn.Module):
-    def __init__(self, n_channels: list[int], kernels: list[int]):
+    def __init__(self, n_channels: list[int], kernels: list[int], maxpools: list[bool]):
         super().__init__()
 
         assert (
@@ -23,7 +23,9 @@ class CNNEncoder(nn.Module):
                     ),
                     nn.GELU(),
                     nn.GroupNorm(num_groups=1, num_channels=n_channels[layer_id + 1]),
-                    nn.MaxPool2d(kernel_size=2, stride=2),
+                    nn.MaxPool2d(kernel_size=2, stride=2)
+                    if maxpools[layer_id]
+                    else nn.Identity(),
                 )
                 for layer_id in range(len(kernels))
             ]
@@ -52,7 +54,9 @@ class GRUPolicy(nn.Module):
         self,
         n_channels: list[int],
         kernels: list[int],
+        maxpools: list[bool],
         embedding_size: int,
+        n_layers_mlp: int,
         gru_hidden_size: int,
         gru_num_layers: int,
         n_actions: int,
@@ -60,11 +64,22 @@ class GRUPolicy(nn.Module):
         super().__init__()
 
         self.action_encoder = nn.Embedding(n_actions, embedding_size)
-        self.cnn_encoder = CNNEncoder(n_channels, kernels)
+        self.cnn_encoder = CNNEncoder(n_channels, kernels, maxpools)
         self.project = nn.Sequential(
             nn.Flatten(start_dim=1),
             nn.LazyLinear(embedding_size),
+            nn.GELU(),
             nn.LayerNorm(embedding_size),
+        )
+        self.mlp = nn.Sequential(
+            *[
+                nn.Sequential(
+                    nn.Linear(embedding_size, embedding_size),
+                    nn.GELU(),
+                    nn.LayerNorm(embedding_size),
+                )
+                for _ in range(n_layers_mlp)
+            ]
         )
         self.gru = nn.GRU(
             input_size=embedding_size,
@@ -105,6 +120,7 @@ class GRUPolicy(nn.Module):
 
         # Add the action embedding.
         x = x + self.action_encoder(actions)
+        x = self.mlp(x)
 
         # Run the GRU.
         x = x.unsqueeze(0)  # Add a fictive time dimension.

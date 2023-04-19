@@ -82,7 +82,9 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
     model = GRUPolicy(
         n_channels=config.model.n_channels,
         kernels=config.model.kernels,
+        maxpools=config.model.maxpools,
         embedding_size=config.model.embedding_size,
+        n_layers_mlp=config.model.n_layers_mlp,
         gru_hidden_size=config.model.gru_hidden_size,
         gru_num_layers=config.model.gru_num_layers,
         n_actions=5,

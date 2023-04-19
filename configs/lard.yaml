@@ -3,15 +3,17 @@ env:
   patch_size: 224
   max_ep_len: 20
 data:
-  batch_size: 32
+  batch_size: 16
   num_workers: 0
   dataset: standard
   path: ./.data/lard_dataset/lard/1.0.0/
 model:
-  n_channels: [3, 5, 10, 15, 20, 25]
-  kernels: [5, 5, 5, 5, 3]
-  embedding_size: 92
-  gru_hidden_size: 64
+  n_channels: [3, 5, 10, 15, 20, 25, 25, 25, 20]
+  kernels: [5, 5, 5, 5, 3, 3, 3, 3]
+  maxpools: [true, true, false, false, true, false, true, true]
+  embedding_size: 128
+  n_layers_mlp: 4
+  gru_hidden_size: 92
   gru_num_layers: 4
 optimizer:
   learning_rate: 1.0e-5
