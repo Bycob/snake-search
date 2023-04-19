@@ -1,4 +1,5 @@
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Iterator
 
 import torch
@@ -41,6 +42,9 @@ class Reinforce:
         self.log_every = log_every
         self.plot_every = plot_every
         self.device = device
+
+        self.checkpoint_dir = Path("checkpoints")
+        self.checkpoint_dir.mkdir(exist_ok=True)
 
     def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
         """Do a rollout on the given environment.
@@ -189,6 +193,8 @@ class Reinforce:
                     plots = self.get_predictions(test_iter)
                     metrics["trajectories/test"] = wandb.Image(plots)
 
+                    self.checkpoint(step_id)
+
                 if metrics:
                     run.log(metrics)
 
@@ -275,3 +281,11 @@ class Reinforce:
         ]
         images = torch.stack(images, dim=0)
         return images
+
+    def checkpoint(self, step_id: int):
+        """Save the model's parameters."""
+        state_dicts = {
+            "model": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+        }
+        torch.save(state_dicts, self.checkpoint_dir / f"{step_id}.pt")
