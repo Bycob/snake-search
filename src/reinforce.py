@@ -288,4 +288,4 @@ class Reinforce:
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
         }
-        torch.save(state_dicts, self.checkpoint_dir / f"{step_id}.pt")
+        torch.save(state_dicts, self.checkpoint_dir / f"{step_id % 20}.pt")
