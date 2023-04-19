@@ -190,8 +190,9 @@ class NeedleEnv(gym.Env):
         finishing_reward.masked_fill_(~just_finished, 0)
 
         rewards = delta_rewards + 0 * finishing_reward
+        rewards = rewards / self.max_scores
 
-        percentages = new_scores / self.bbox_masks.sum(dim=(1, 2))
+        percentages = new_scores / self.max_scores
 
         infos = {
             "positions": self.positions,
