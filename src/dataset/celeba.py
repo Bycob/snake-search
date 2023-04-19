@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import CelebA
-from torchvision.transforms import ToTensor
+from torchvision.transforms import PILToTensor
 
 
 class CelebADataset(Dataset):
@@ -20,7 +20,7 @@ class CelebADataset(Dataset):
             target_type="landmarks",
             download=True,
         )
-        self.transform = ToTensor()
+        self.transform = PILToTensor()
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         """Load an image and its left eye bounding box.

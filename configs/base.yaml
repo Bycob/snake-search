@@ -10,7 +10,9 @@ data:
 model:
   n_channels: [3, 5, 10, 25]
   kernels: [3, 3, 3]
+  maxpools: [true, true, true]
   embedding_size: 64
+  n_layers_mlp: 1
   gru_hidden_size: 44
   gru_num_layers: 4
 optimizer:

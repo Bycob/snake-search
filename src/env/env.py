@@ -44,7 +44,7 @@ class NeedleEnv(gym.Env):
 
         ---
         Args:
-            images: A batch of images.
+            images: A batch of images, as uint8 RGB (saves memory).
                 Shape of [batch_size, n_channels, height, width].
             bboxes: The bounding boxes of the batch.
                 List of length `batch_size`, where each element is
@@ -146,7 +146,8 @@ class NeedleEnv(gym.Env):
             ),
             "percentages": percentages,
         }
-        return self.patches, infos
+        patches = self.patches / 255
+        return patches, infos
 
     @torch.no_grad()
     def step(self, actions: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, dict]:
@@ -199,7 +200,9 @@ class NeedleEnv(gym.Env):
             "percentages": percentages,
         }
 
-        return self.patches, rewards, self.terminated, truncated, infos
+        patches = self.patches / 255
+
+        return patches, rewards, self.terminated, truncated, infos
 
     def apply_movements(self, movements: Tensor):
         """Apply the movements to the agents.

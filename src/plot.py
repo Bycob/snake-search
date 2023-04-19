@@ -9,8 +9,9 @@ def plot_image(
     axe: plt.Axes, image: np.ndarray, patch_size: int, cmap: Optional[str] = "gray"
 ):
     # Increase lightness of the image.
-    image = image * 0.8 + 0.2
-    axe.imshow(image, cmap=cmap, vmin=0, vmax=1)
+    # image = image * 0.8 + 0.2 * 255
+    # image = image.astype(np.uint8)
+    axe.imshow(image, cmap=cmap, vmin=0, vmax=255)
     axe.set_xticks(np.arange(0, image.shape[1], patch_size))
     axe.set_yticks(np.arange(0, image.shape[0], patch_size))
     axe.grid(visible=True, color="white")
@@ -51,12 +52,12 @@ def plot_patches(
     width: int,
 ):
     _, patch_h, patch_w, n_channels = patches.shape
-    image = np.zeros((height, width, n_channels))
+    image = np.zeros((height, width, n_channels), dtype=np.uint8)
     for patch, position in zip(patches, positions):
         image[
             position[0] : position[0] + patch_h, position[1] : position[1] + patch_w
         ] = patch
-    axe.imshow(image, vmin=0, vmax=1, alpha=0.3)
+    axe.imshow(image, vmin=0, vmax=255, alpha=0.3)
 
 
 def plot_trajectory(
@@ -98,15 +99,18 @@ def plot_trajectory(
     parsed_positions = np.array(parsed_positions)
 
     # To progressive gray scale markers.
-    markers = np.ones(
+    markers = np.zeros(
         (parsed_positions.shape[0], patch_size, patch_size, image.shape[2]),
-        dtype=np.float32,
+        dtype=np.uint8,
     )
+    markers.fill(255)
     min_range = 0.3
     for marker_id, marker in enumerate(markers):
         coeff = marker_id / len(markers)  # In range [0, 1].
         coeff = min_range + coeff * (1 - min_range)  # In range [min_range, 1].
         markers[marker_id] = marker * coeff
+
+    markers = markers.astype(np.uint8)
 
     # To red scale.
     markers[:, :, :, 1] = 0

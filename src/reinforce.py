@@ -2,12 +2,11 @@ from collections import defaultdict
 from typing import Any, Iterator
 
 import torch
+import wandb
 from torch.distributions import Categorical
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-import wandb
 
 from .env import NeedleEnv
 from .model import GRUPolicy

@@ -22,7 +22,7 @@ class StandardDataset(Dataset):
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         # Load image from disk.
-        image = read_image(str(self.images[index]), ImageReadMode.RGB).float() / 255
+        image = read_image(str(self.images[index]), ImageReadMode.RGB)
         bboxes = StandardDataset.read_bbox(self.annotations[index])
         return image, bboxes
 
