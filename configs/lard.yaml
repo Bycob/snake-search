@@ -3,14 +3,14 @@ env:
   patch_size: 224
   max_ep_len: 40
 data:
-  batch_size: 8
-  num_workers: 2
+  batch_size: 16
+  num_workers: 4
   dataset: standard
   path: ./.data/lard_dataset/lard/1.0.0/
 model:
   n_channels: [3, 5, 10, 15, 20, 25]
   kernels: [5, 5, 5, 5, 3]
-  maxpools: [true, true, false, true, true]
+  maxpools: [true, true, true, true, true]
   embedding_size: 128
   n_layers_mlp: 4
   gru_hidden_size: 92
