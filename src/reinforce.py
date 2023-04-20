@@ -9,9 +9,9 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from .draw import draw_image_prediction
 from .env import NeedleEnv
 from .model import GRUPolicy
-from .plot import plot_trajectory
 
 
 class Reinforce:
@@ -189,9 +189,9 @@ class Reinforce:
                 if step_id % self.plot_every == 0:
                     # Log the trajectories on a batch of images.
                     plots = self.get_predictions(train_iter)
-                    metrics["trajectories/train"] = wandb.Image(plots)
+                    metrics["trajectories/train"] = wandb.Image(plots / 255)
                     plots = self.get_predictions(test_iter)
-                    metrics["trajectories/test"] = wandb.Image(plots)
+                    metrics["trajectories/test"] = wandb.Image(plots / 255)
 
                     self.checkpoint(step_id)
 
@@ -274,7 +274,7 @@ class Reinforce:
         masks[:, 0] = True
 
         images = [
-            plot_trajectory(image, pos[mask], env.patch_size, bboxes)
+            draw_image_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
                 env.images, positions, masks, env.bboxes
             )
