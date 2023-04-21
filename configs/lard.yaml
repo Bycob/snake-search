@@ -21,7 +21,7 @@ optimizer:
 reinforce:
   n_iterations: 200000
   log_every: 50
-  plot_every: 500
+  plot_every: 100
 device: auto
 hydra:
   job:

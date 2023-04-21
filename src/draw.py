@@ -53,7 +53,10 @@ def draw_image_prediction(
     positions: torch.Tensor,
     bboxes: torch.Tensor,
     patch_size: int,
+    image_width: int = 500,
 ) -> torch.Tensor:
+    device = image.device
+
     # Torch operations.
     image = image.permute(1, 2, 0)
     image = draw_positions(image, positions, patch_size)
@@ -67,8 +70,13 @@ def draw_image_prediction(
     for bbox in bboxes:
         draw_bbox(draw, bbox, color="green")
 
+    # Resize image.
+    image_height = int(image_width * image.shape[0] / image.shape[1])
+    pil_image = pil_image.resize((image_width, image_height), resample=Image.BILINEAR)
+
     # To torch.
-    image = torch.from_numpy(np.array(pil_image)).permute(2, 0, 1)
+    image = torch.from_numpy(np.array(pil_image))
+    image = image.permute(2, 0, 1)
     image = image.type(torch.uint8)
 
     return image

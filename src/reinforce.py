@@ -203,11 +203,11 @@ class Reinforce:
 
                 metrics = dict()
                 if step_id % self.log_every == 0:
-                    for loader, name in [
-                        (self.train_loader, "train"),
-                        (self.test_loader, "test"),
+                    for iter_loader, name in [
+                        (train_iter, "train"),
+                        (test_iter, "test"),
                     ]:
-                        loader_metrics = self.test_model(loader, 10)
+                        loader_metrics = self.test_model(iter_loader, 2)
                         for key, value in loader_metrics.items():
                             metrics[f"{name}/{key}"] = value
 
@@ -224,12 +224,14 @@ class Reinforce:
                     run.log(metrics)
 
     @torch.no_grad()
-    def test_model(self, loader: DataLoader, n_iters: int) -> dict[str, torch.Tensor]:
+    def test_model(
+        self, iter_loader: DataLoader, n_iters: int
+    ) -> dict[str, torch.Tensor]:
         """Test the model on the given loader, returns the computed metrics."""
         self.model.eval()
         all_metrics = defaultdict(list)
         for _ in range(n_iters):
-            images, bboxes = next(iter(loader))
+            images, bboxes = next(iter_loader)
             images = images.to(self.device)
 
             env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
