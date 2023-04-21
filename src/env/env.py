@@ -157,7 +157,7 @@ class NeedleEnv(gym.Env):
         ---
         Args:
             actions: The actions to apply.
-                Shape of [batch_size,].
+                Shape of [batch_size, 4].
         ---
         Returns:
             patches: The patches where are the agents.
@@ -644,7 +644,7 @@ class NeedleEnv(gym.Env):
         ---
         Args:
             actions: The actions to apply.
-                Shape of [batch_size,].
+                Shape of [batch_size, 4].
         ---
         Returns:
             The movements to apply to the agents encoded as tuples `(delta_y, delta_x)`.
@@ -657,24 +657,13 @@ class NeedleEnv(gym.Env):
             device=device,
         )
 
-        # Masks.
-        up = actions == Action.UP.value
-        down = actions == Action.DOWN.value
-        left = actions == Action.LEFT.value
-        right = actions == Action.RIGHT.value
-        left_up = actions == Action.LEFT_UP.value
-        right_up = actions == Action.RIGHT_UP.value
-        left_down = actions == Action.LEFT_DOWN.value
-        right_down = actions == Action.RIGHT_DOWN.value
+        # Deltas.
+        movements[:, 0] = actions[:, 1]
+        movements[:, 1] = actions[:, 0]
 
-        # Up.
-        movements[up | left_up | right_up, 0] = -1
-        # Down.
-        movements[down | left_down | right_down, 0] = 1
-        # Right.
-        movements[right | right_up | right_down, 1] = 1
-        # Left.
-        movements[left | left_up | left_down, 1] = -1
+        # Directions.
+        movements[:, 0][actions[:, 2] == 1] *= -1
+        movements[:, 1][actions[:, 3] == 1] *= -1
 
         return movements
 

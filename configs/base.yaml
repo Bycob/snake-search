@@ -15,6 +15,7 @@ model:
   n_layers_mlp: 1
   gru_hidden_size: 44
   gru_num_layers: 4
+  maximum_steps: 3
 optimizer:
   learning_rate: 1.0e-4
 reinforce:

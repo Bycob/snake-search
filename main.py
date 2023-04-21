@@ -87,12 +87,12 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
         n_layers_mlp=config.model.n_layers_mlp,
         gru_hidden_size=config.model.gru_hidden_size,
         gru_num_layers=config.model.gru_num_layers,
-        n_actions=5,
+        maximum_steps=config.model.maximum_steps,
     )
     image, _ = dataset[0]
     n_channels = image.shape[0]
     patches = torch.zeros((1, n_channels, config.env.patch_size, config.env.patch_size))
-    actions = torch.zeros((1,), dtype=torch.long)
+    actions = torch.zeros((1, 4), dtype=torch.long)
     summary(
         model,
         input_data=[patches, actions],
