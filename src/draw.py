@@ -13,8 +13,9 @@ def draw_grid(draw: ImageDraw.ImageDraw, patch_size: int):
 
 
 def draw_bbox(draw: ImageDraw.ImageDraw, bbox: torch.Tensor, color: str = "green"):
+    bbox = bbox.cpu().numpy()
     draw.rectangle(
-        (bbox[0].item(), bbox[1].item(), bbox[2].item(), bbox[3].item()),
+        (bbox[0], bbox[1], bbox[2], bbox[3]),
         outline=color,
         width=3,
     )
@@ -28,7 +29,9 @@ def draw_positions(
     for position_idx, position in enumerate(positions):
         coeff = position_idx / len(positions)  # In range [0, 1].
         coeff = min_range + (1 - min_range) * coeff  # In range [min_range, 1].
-        red_mask = torch.zeros((patch_size, patch_size, 3), dtype=torch.uint8)
+        red_mask = torch.zeros(
+            (patch_size, patch_size, 3), dtype=torch.uint8, device=image.device
+        )
         red_mask[:, :, 0] = 255 * coeff
 
         patch = image[
@@ -53,10 +56,10 @@ def draw_image_prediction(
 ) -> torch.Tensor:
     # Torch operations.
     image = image.permute(1, 2, 0)
-    image = draw_positions(image, positions, 32)
+    image = draw_positions(image, positions, patch_size)
 
     # PIL operations.
-    pil_image = Image.fromarray(image.numpy())
+    pil_image = Image.fromarray(image.cpu().numpy())
     draw = ImageDraw.Draw(pil_image)
 
     draw_grid(draw, patch_size)

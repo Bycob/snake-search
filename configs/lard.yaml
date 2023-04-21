@@ -1,10 +1,10 @@
 group: LARD
 env:
   patch_size: 224
-  max_ep_len: 40
+  max_ep_len: 20
 data:
-  batch_size: 16
-  num_workers: 4
+  batch_size: 20
+  num_workers: 2
   dataset: standard
   path: ./.data/lard_dataset/lard/1.0.0/
 model:
@@ -15,10 +15,11 @@ model:
   n_layers_mlp: 4
   gru_hidden_size: 92
   gru_num_layers: 4
+  maximum_steps: 3
 optimizer:
   learning_rate: 1.0e-5
 reinforce:
-  n_iterations: 100000
+  n_iterations: 200000
   log_every: 50
   plot_every: 500
 device: auto
