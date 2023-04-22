@@ -50,26 +50,20 @@ class Reinforce:
         self, logits: dict[str, torch.Tensor]
     ) -> tuple[torch.Tensor, torch.Tensor]:
         actions = torch.zeros(
-            (logits["delta_x"].shape[0], 4),
+            (logits["jumps_x"].shape[0], 2),
             dtype=torch.long,
             device=self.device,
         )
         logprobs = torch.zeros(
-            (logits["delta_x"].shape[0], 4),
+            (logits["jumps_x"].shape[0], 2),
             dtype=torch.float,
             device=self.device,
         )
-        for action_id, action_name in enumerate(["delta_x", "delta_y"]):
+        for action_id, action_name in enumerate(["jumps_x", "jumps_y"]):
             categorical = Categorical(logits=logits[action_name])
             sampled_actions = categorical.sample()
             actions[:, action_id] = sampled_actions
             logprobs[:, action_id] = categorical.log_prob(sampled_actions)
-
-        for action_id, action_name in enumerate(["direction_x", "direction_y"]):
-            binomial = Bernoulli(logits=logits[action_name].squeeze(-1))
-            sampled_actions = binomial.sample()
-            actions[:, action_id + 2] = sampled_actions
-            logprobs[:, action_id + 2] = binomial.log_prob(sampled_actions)
 
         return actions, logprobs
 
@@ -96,13 +90,15 @@ class Reinforce:
         )
 
         memory = None
-        actions = torch.zeros((env.batch_size, 4), dtype=torch.long, device=self.device)
+        actions = torch.zeros((env.batch_size, 2), dtype=torch.long, device=self.device)
         patches, _ = env.reset()
 
         for step_id in range(env.max_ep_len):
             logits, memory = self.model(patches, actions, memory)
             actions, logprobs_ = self.sample_from_logits(logits)
-            patches, step_rewards, terminated, truncated, infos = env.step(actions)
+            patches, step_rewards, terminated, truncated, infos = env.step(
+                actions - self.model.jump_size
+            )
 
             rewards[:, step_id] = step_rewards
             logprobs[:, step_id] = logprobs_.sum(dim=1)
@@ -272,7 +268,7 @@ class Reinforce:
         """
         self.model.eval()
         memory = None
-        actions = torch.zeros((env.batch_size, 4), dtype=torch.long, device=self.device)
+        actions = torch.zeros((env.batch_size, 2), dtype=torch.long, device=self.device)
         patches, infos = env.reset()
 
         positions = torch.zeros(
@@ -292,7 +288,7 @@ class Reinforce:
             # actions = logits.argmax(dim=1)  # Greedy policy.
             actions, _ = self.sample_from_logits(logits)
 
-            patches, _, terminated, _, infos = env.step(actions)
+            patches, _, terminated, _, infos = env.step(actions - self.model.jump_size)
             positions[:, step_id + 1] = infos["positions"]
             masks[:, step_id + 1] = ~terminated
 

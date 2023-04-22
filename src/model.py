@@ -59,13 +59,14 @@ class GRUPolicy(nn.Module):
         n_layers_mlp: int,
         gru_hidden_size: int,
         gru_num_layers: int,
-        maximum_steps: int,
+        jump_size: int,
     ):
         super().__init__()
+        self.jump_size = jump_size
 
-        self.steps_encoder = nn.Embedding(maximum_steps, embedding_size)
+        self.jumps_encoder = nn.Embedding(2 * jump_size + 1, embedding_size)
         self.direction_encoder = nn.Embedding(2, embedding_size)
-        self.project_encoded_actions = nn.Linear(4 * embedding_size, embedding_size)
+        self.project_encoded_actions = nn.Linear(2 * embedding_size, embedding_size)
         self.cnn_encoder = CNNEncoder(n_channels, kernels, maxpools)
         self.project = nn.Sequential(
             nn.Flatten(start_dim=1),
@@ -90,27 +91,19 @@ class GRUPolicy(nn.Module):
         )
         self.heads = nn.ModuleDict(
             {
-                "delta_x": nn.Linear(gru_hidden_size, maximum_steps),
-                "delta_y": nn.Linear(gru_hidden_size, maximum_steps),
-                "direction_x": nn.Linear(gru_hidden_size, 1),
-                "direction_y": nn.Linear(gru_hidden_size, 1),
+                "jumps_x": nn.Linear(gru_hidden_size, 2 * jump_size + 1),
+                "jumps_y": nn.Linear(gru_hidden_size, 2 * jump_size + 1),
             }
         )
 
     def encode_actions(self, actions: torch.Tensor) -> torch.Tensor:
         delta_x = actions[:, 0]
         delta_y = actions[:, 1]
-        direction_x = actions[:, 2]
-        direction_y = actions[:, 3]
 
-        delta_x = self.steps_encoder(delta_x)
-        delta_y = self.steps_encoder(delta_y)
-        direction_x = self.direction_encoder(direction_x)
-        direction_y = self.direction_encoder(direction_y)
+        delta_x = self.jumps_encoder(delta_x)
+        delta_y = self.jumps_encoder(delta_y)
 
-        encoded_actions = torch.concat(
-            (delta_x, delta_y, direction_x, direction_y), dim=1
-        )
+        encoded_actions = torch.concat((delta_x, delta_y), dim=1)
         encoded_actions = self.project_encoded_actions(encoded_actions)
         return encoded_actions
 
@@ -129,7 +122,7 @@ class GRUPolicy(nn.Module):
             x: The batch of patches of images.
                 Shape of [batch_size, num_channels, patch_size, patch_size].
             actions: The previous action taken.
-                Shape of [batch_size, 4].
+                Shape of [batch_size, 2].
             memory: The memory of the previous step.
                 Shape of [gru_num_layers, batch_size, gru_hidden_size].
 
