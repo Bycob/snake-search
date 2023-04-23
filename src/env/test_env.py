@@ -7,6 +7,7 @@ import pytest
 import torch
 from torch import Tensor
 
+from ..dataset import NeedleDataset
 from .env import Action, NeedleEnv
 
 
@@ -41,11 +42,13 @@ def test_parse_bboxes():
     width, height = 500, 500
     patch_size = 100
     max_ep_len = 10
-    images = torch.randn(batch_size, 3, height, width)
+    images = [torch.randn(3, height, width) for _ in range(batch_size)]
 
     # Simple case: only one bbox per image, in a single patch.
     bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
     bboxes, bbox_masks = env.parse_bboxes(bboxes)
 
     assert bboxes.shape == torch.Size(
@@ -65,7 +68,9 @@ def test_parse_bboxes():
 
     # Harder case: One bbox per image, in multiple patches.
     bboxes = [torch.LongTensor([[10, 5, 120, 130]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
     bboxes, bbox_masks = env.parse_bboxes(bboxes)
 
     # Make sure the bbox is well located across the patches.
@@ -92,9 +97,11 @@ def test_parse_bboxes():
 )
 def test_patches(batch_size: int, width: int, height: int, patch_size: int):
     max_ep_len = 10
-    images = torch.randn(batch_size, 3, height, width)
+    images = [torch.randn(3, height, width) for _ in range(batch_size)]
     bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
 
     positions = torch.zeros((batch_size, 2), dtype=torch.long)
     positions[:, 0] = torch.randint(
@@ -107,7 +114,7 @@ def test_patches(batch_size: int, width: int, height: int, patch_size: int):
 
     target_patches = list()
     for batch_id, position in enumerate(positions):
-        patch = images[
+        patch = batch_images[
             batch_id,
             :,
             position[0] * patch_size : (position[0] + 1) * patch_size,
@@ -129,9 +136,11 @@ def test_patches(batch_size: int, width: int, height: int, patch_size: int):
 )
 def test_movements(batch_size: int, width: int, height: int, patch_size: int):
     max_ep_len = 10
-    images = torch.randn(batch_size, 3, height, width)
+    images = [torch.randn(3, height, width) for _ in range(batch_size)]
     bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
     positions = torch.zeros((batch_size, 2), dtype=torch.long)
     positions[:, 0] = torch.randint(
         low=0, high=env.n_vertical_patches, size=(batch_size,)
@@ -163,9 +172,11 @@ def test_tiles_reached():
     height, width = 30, 40
     patch_size = 10
     max_ep_len = 10
-    images = torch.randn(batch_size, 3, height, width)
+    images = [torch.randn(3, height, width) for _ in range(batch_size)]
     bboxes = [torch.LongTensor([[0, 0, 20, 29]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
 
     env.positions = torch.LongTensor(
         [
@@ -188,9 +199,11 @@ def test_closest_bbox_coord_and_best_actions():
     height, width = 30, 40
     patch_size = 10
     max_ep_len = 10
-    images = torch.randn(batch_size, 3, height, width)
+    images = [torch.randn(3, height, width) for _ in range(batch_size)]
     bboxes = [torch.LongTensor([[0, 0, 5, 22]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
 
     # With no visited patches.
     env.positions = torch.LongTensor([[0, 1], [1, 2], [2, 3]])
@@ -231,22 +244,38 @@ def test_convert_bboxes_to_masks():
     width, height = 500, 500
     patch_size = 100
     max_ep_len = 10
-    images = torch.randn(batch_size, 3, height, width)
+    images = [torch.randn(3, height, width) for _ in range(batch_size)]
 
     # Simple case: only one bbox per image, in a single patch.
     bboxes = [torch.LongTensor([[0, 0, 20, 30]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
 
-    masks = env.convert_bboxes_to_masks(bboxes)
+    masks = env.convert_bboxes_to_masks(batch_bboxes)
     _, parsed_masks = env.parse_bboxes(bboxes)
     parsed_masks = parsed_masks.max(dim=-1).values
     assert torch.all(masks == parsed_masks)
 
     # Harder case: One bbox per image, in multiple patches.
     bboxes = [torch.LongTensor([[10, 5, 120, 130]]) for _ in range(batch_size)]
-    env = NeedleEnv(images, bboxes, patch_size, max_ep_len)
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
 
-    masks = env.convert_bboxes_to_masks(bboxes)
+    masks = env.convert_bboxes_to_masks(batch_bboxes)
+    _, parsed_masks = env.parse_bboxes(bboxes)
+    parsed_masks = parsed_masks.max(dim=-1).values
+    assert torch.all(masks == parsed_masks)
+
+    # Add padding to the bounding boxes, which should have no impact.
+    bboxes = [torch.LongTensor([[10, 5, 120, 130]]) for _ in range(batch_size)]
+    bboxes[0] = torch.LongTensor([[10, 5, 120, 130], [0, 5, 4, 10]])
+    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
+    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
+    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
+
+    masks = env.convert_bboxes_to_masks(batch_bboxes)
     _, parsed_masks = env.parse_bboxes(bboxes)
     parsed_masks = parsed_masks.max(dim=-1).values
     assert torch.all(masks == parsed_masks)

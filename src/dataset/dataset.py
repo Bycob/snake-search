@@ -1,4 +1,5 @@
 import torch
+from kornia.geometry.boxes import Boxes
 from torch.utils.data import Dataset
 
 
@@ -34,12 +35,15 @@ class NeedleDataset(Dataset):
     @staticmethod
     def collate_fn(
         batch: list[tuple[torch.Tensor, torch.Tensor]], patch_size: int
-    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, Boxes]:
         """Collate the batch of images and bboxes.
         The images are stacked in a tensor and the bboxes are stacked in a list.
 
         The images can be of varying sizes. They are padded with zeros to match
         the biggest image. They are also padded to a multiple of `patch_size`.
+
+        The bounding boxes are padded with zeros to match the biggest number of
+        bounding boxes in an image of the batch.
 
         ---
         Args:
@@ -51,9 +55,7 @@ class NeedleDataset(Dataset):
         Returns:
             images: The batch of images.
                 Shape of [batch_size, num_channels, height, width].
-            bounding_boxes: The list of bounding boxes.
-                List of length `batch_size`, where each element is
-                a tensor of shape [n_bboxes, 4].
+            bounding_boxes: The padded bounding boxes, kornia format.
         """
         images, bboxes = [], []
         for image, bbox in batch:
@@ -70,6 +72,8 @@ class NeedleDataset(Dataset):
         # Add padding to match a multiple of patch_size.
         delta_h = patch_size - max_height % patch_size
         delta_w = patch_size - max_width % patch_size
+        delta_h = delta_h if delta_h != patch_size else 0
+        delta_w = delta_w if delta_w != patch_size else 0
         final_height = max_height + delta_h
         final_width = max_width + delta_w
 
@@ -83,4 +87,5 @@ class NeedleDataset(Dataset):
             )
 
         images = torch.stack(images, dim=0)
+        bboxes = Boxes.from_tensor(bboxes, mode="xyxy")
         return images, bboxes

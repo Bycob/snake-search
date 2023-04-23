@@ -127,7 +127,9 @@ def main(config: DictConfig):
         device=config.device,
     )
     reinforce.launch_training(
-        config.group, OmegaConf.to_container(config, resolve=True)
+        config.group,
+        OmegaConf.to_container(config, resolve=True),
+        config.mode,
     )
 
 

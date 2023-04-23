@@ -18,7 +18,6 @@ torchvision = "^0.15.1"
 hydra-core = "^1.3.2"
 tqdm = "^4.65.0"
 kornia = "^0.6.11"
-kornia-rs = "^0.0.8"
 pandas = "^2.0.0"
 
 

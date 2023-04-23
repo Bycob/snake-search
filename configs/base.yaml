@@ -22,6 +22,7 @@ reinforce:
   log_every: 50
   plot_every: 500
 device: auto
+mode: online
 hydra:
   job:
     chdir: true
