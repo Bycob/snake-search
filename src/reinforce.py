@@ -2,9 +2,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterator
 
+import kornia.augmentation as aug
 import torch
 import wandb
-from torch.distributions import Bernoulli, Categorical
+from kornia.geometry.boxes import Boxes
+from torch.distributions import Categorical
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -46,6 +48,12 @@ class Reinforce:
         self.checkpoint_dir = Path("checkpoints")
         self.checkpoint_dir.mkdir(exist_ok=True)
 
+        self.augmentations = aug.AugmentationSequential(
+            aug.RandomHorizontalFlip(p=0.5),
+            aug.RandomAffine(degrees=5, translate=(1 / 4, 1 / 3), p=0.5),
+            data_keys=["input", "bbox"],
+        )
+
     def sample_from_logits(
         self, logits: dict[str, torch.Tensor]
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -66,6 +74,16 @@ class Reinforce:
             logprobs[:, action_id] = categorical.log_prob(sampled_actions)
 
         return actions, logprobs
+
+    def augment_batch(
+        self, images: torch.Tensor, bboxes: torch.Tensor
+    ) -> tuple[torch.Tensor, Boxes]:
+        """Apply augmentations to a batch of images and bboxes."""
+        image_dtype = images.dtype
+        images = images.to(bboxes.dtype)
+        images, bboxes = self.augmentations(images, bboxes)
+        images = images.to(image_dtype)
+        return images, bboxes
 
     def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
         """Do a rollout on the given environment.
@@ -157,7 +175,7 @@ class Reinforce:
         metrics["episode-length"] = masks.sum(dim=1).float().mean()
         return metrics
 
-    def launch_training(self, group: str, config: dict[str, Any]):
+    def launch_training(self, group: str, config: dict[str, Any], mode: str = "online"):
         """Train the model using REINFORCE.
         The logs are sent to Weights & Biases.
 
@@ -180,6 +198,7 @@ class Reinforce:
             entity="pierrotlc",
             group=group,
             config=config,
+            mode=mode,
         ) as run:
             # Log gradients and model parameters.
             run.watch(self.model)
@@ -187,7 +206,8 @@ class Reinforce:
             for step_id in tqdm(range(self.n_iterations)):
                 self.model.train()
                 images, bboxes = next(train_iter)
-                images = images.to(self.device)
+                images, bboxes = images.to(self.device), bboxes.to(self.device)
+                images, bboxes = self.augment_batch(images, bboxes)
                 env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
 
                 rollout = self.rollout(env)
@@ -228,7 +248,7 @@ class Reinforce:
         all_metrics = defaultdict(list)
         for _ in range(n_iters):
             images, bboxes = next(iter_loader)
-            images = images.to(self.device)
+            images, bboxes = images.to(self.device), bboxes.to(self.device)
 
             env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
 
@@ -245,7 +265,7 @@ class Reinforce:
     ) -> torch.Tensor:
         """Sample from the loader and make predictions on the sampled images."""
         images, bboxes = next(iter_loader)
-        images = images.to(self.device)
+        images, bboxes = images.to(self.device), bboxes.to(self.device)
         images = images[:n_predictions]
         bboxes = bboxes[:n_predictions]
         env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
@@ -300,7 +320,7 @@ class Reinforce:
         images = [
             draw_image_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
-                env.images, positions, masks, env.bboxes
+                env.images, positions, masks, env.bboxes.to_tensor()
             )
         ]
         images = torch.stack(images, dim=0)

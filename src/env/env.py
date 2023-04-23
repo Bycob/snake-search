@@ -3,6 +3,7 @@ from enum import Enum
 import einops
 import gymnasium as gym
 import torch
+from kornia.geometry.boxes import Boxes
 from torch import Tensor
 
 # Define the available actions.
@@ -36,7 +37,7 @@ class NeedleEnv(gym.Env):
     def __init__(
         self,
         images: Tensor,
-        bboxes: list[Tensor],
+        bboxes: Boxes,
         patch_size: int,
         max_ep_len: int,
     ):
@@ -50,7 +51,7 @@ class NeedleEnv(gym.Env):
                 List of length `batch_size`, where each element is
                 a tensor of shape [n_bboxes, 4].
         """
-        assert len(images) == len(bboxes)
+        assert images.shape[0] == bboxes.shape[0]
         assert len(images.shape) == 4
 
         self.images = images
@@ -476,14 +477,12 @@ class NeedleEnv(gym.Env):
 
         return sample
 
-    def convert_bboxes_to_masks(self, bboxes: list[Tensor]) -> Tensor:
+    def convert_bboxes_to_masks(self, bboxes: Boxes) -> Tensor:
         """Convert the bounding boxes to masks.
 
         ---
         Args:
-            bboxes: The bounding boxes of the batch.
-                List of length `batch_size`, where each element is
-                a tensor of shape [n_bboxes, 4].
+            bboxes: The bounding boxes of the batch, in kornia format.
 
         ---
         Returns:
@@ -491,20 +490,8 @@ class NeedleEnv(gym.Env):
                 contains at least a bounding box.
                 Shape of [batch_size, n_vertical_patches, n_horizontal_patches].
         """
-        masks = torch.zeros(
-            (
-                self.batch_size,
-                self.height,
-                self.width,
-            ),
-            dtype=torch.float32,  # MaxPool2d does not support bool.
-            device=self.device,
-        )
-
-        # There could be a faster way to do this...
-        for batch_id, bboxes_ in enumerate(bboxes):
-            for bbox in bboxes_:
-                masks[batch_id, bbox[1] : bbox[3], bbox[0] : bbox[2]] = 1
+        masks = bboxes.to_mask(self.height, self.width)
+        masks = masks.max(dim=1).values  # Merge the channels.
 
         # Logical OR of the masks, to reduce to the patch dimensions.
         masks = torch.nn.functional.max_pool2d(masks, self.patch_size)

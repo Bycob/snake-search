@@ -15,7 +15,7 @@ model:
   n_layers_mlp: 1
   gru_hidden_size: 44
   gru_num_layers: 4
-  jump_size: 3
+  jump_size: 1
 optimizer:
   learning_rate: 1.0e-4
 reinforce:
@@ -23,6 +23,7 @@ reinforce:
   log_every: 50
   plot_every: 500
 device: auto
+mode: online
 hydra:
   job:
     chdir: true
