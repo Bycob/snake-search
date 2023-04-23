@@ -54,6 +54,17 @@ class Reinforce:
             data_keys=["input", "bbox"],
         )
 
+    @torch.no_grad()
+    def augment_batch(
+        self, images: torch.Tensor, bboxes: torch.Tensor
+    ) -> tuple[torch.Tensor, Boxes]:
+        """Apply augmentations to a batch of images and bboxes."""
+        image_dtype = images.dtype
+        images = images.to(bboxes.dtype)
+        images, bboxes = self.augmentations(images, bboxes)
+        images = images.to(image_dtype)
+        return images, bboxes
+
     def sample_from_logits(
         self, logits: dict[str, torch.Tensor]
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -74,16 +85,6 @@ class Reinforce:
             logprobs[:, action_id] = categorical.log_prob(sampled_actions)
 
         return actions, logprobs
-
-    def augment_batch(
-        self, images: torch.Tensor, bboxes: torch.Tensor
-    ) -> tuple[torch.Tensor, Boxes]:
-        """Apply augmentations to a batch of images and bboxes."""
-        image_dtype = images.dtype
-        images = images.to(bboxes.dtype)
-        images, bboxes = self.augmentations(images, bboxes)
-        images = images.to(image_dtype)
-        return images, bboxes
 
     def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
         """Do a rollout on the given environment.
@@ -229,9 +230,9 @@ class Reinforce:
 
                 if step_id % self.plot_every == 0:
                     # Log the trajectories on a batch of images.
-                    plots = self.get_predictions(train_iter)
+                    plots = self.get_predictions(train_iter, augment=True)
                     metrics["trajectories/train"] = wandb.Image(plots / 255)
-                    plots = self.get_predictions(test_iter)
+                    plots = self.get_predictions(test_iter, augment=False)
                     metrics["trajectories/test"] = wandb.Image(plots / 255)
 
                     self.checkpoint(step_id)
@@ -261,13 +262,18 @@ class Reinforce:
         return {key: torch.stack(values).mean() for key, values in all_metrics.items()}
 
     def get_predictions(
-        self, iter_loader: Iterator, n_predictions: int = 16
+        self,
+        iter_loader: Iterator,
+        n_predictions: int = 16,
+        augment: bool = False,
     ) -> torch.Tensor:
         """Sample from the loader and make predictions on the sampled images."""
         images, bboxes = next(iter_loader)
         images, bboxes = images.to(self.device), bboxes.to(self.device)
         images = images[:n_predictions]
         bboxes = bboxes[:n_predictions]
+        if augment:
+            images, bboxes = self.augment_batch(images, bboxes)
         env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
         plots = self.predict(env)
         return plots
