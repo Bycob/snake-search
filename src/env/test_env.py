@@ -152,9 +152,9 @@ def test_movements(batch_size: int, width: int, height: int, patch_size: int):
 
     for _ in range(10):
         actions = torch.randint(low=0, high=len(Action), size=(batch_size,))
-        env.step(actions)
-
         movements = NeedleEnv.parse_actions(actions)
+        env.step(movements)
+
         for batch_id, move in enumerate(movements):
             positions[batch_id] += move
             positions[batch_id][0] = max(
