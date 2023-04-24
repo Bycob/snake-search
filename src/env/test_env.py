@@ -157,12 +157,8 @@ def test_movements(batch_size: int, width: int, height: int, patch_size: int):
 
         for batch_id, move in enumerate(movements):
             positions[batch_id] += move
-            positions[batch_id][0] = max(
-                0, min(env.n_vertical_patches - 1, positions[batch_id][0].item())
-            )
-            positions[batch_id][1] = max(
-                0, min(env.n_horizontal_patches - 1, positions[batch_id][1].item())
-            )
+            positions[batch_id][0] = positions[batch_id][0] % env.n_vertical_patches
+            positions[batch_id][1] = positions[batch_id][1] % env.n_horizontal_patches
 
         assert torch.all(env.positions == positions)
 

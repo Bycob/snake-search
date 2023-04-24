@@ -117,7 +117,6 @@ class Reinforce:
 
         for step_id in range(env.max_ep_len):
             logits, memory = self.model(patches, actions, memory)
-            print(logits)
             actions, logprobs_ = self.sample_from_logits(logits)
             patches, step_rewards, terminated, truncated, infos = env.step(
                 actions - self.model.jump_size
