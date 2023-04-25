@@ -57,10 +57,22 @@ def init_datasets(config: DictConfig) -> tuple[NeedleDataset, NeedleDataset]:
 def init_dataloaders(
     config: DictConfig, train_dataset: NeedleDataset, test_dataset: NeedleDataset
 ) -> tuple[DataLoader, DataLoader]:
+    match config.data.fill_mode:
+        case "resize":
+            collate_fn = lambda b: NeedleDataset.resize_collate_fn(
+                b, config.env.patch_size
+            )
+        case "pad":
+            collate_fn = lambda b: NeedleDataset.padded_collate_fn(
+                b, config.env.patch_size
+            )
+        case _:
+            raise ValueError(f"Unknown fill mode: {config.data.fill_mode}")
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.data.batch_size,
-        collate_fn=lambda b: NeedleDataset.collate_fn(b, config.env.patch_size),
+        collate_fn=collate_fn,
         num_workers=config.data.num_workers,
         sampler=RandomSampler(train_dataset, replacement=True, num_samples=int(1e10)),
         shuffle=False,
@@ -69,7 +81,7 @@ def init_dataloaders(
     test_loader = DataLoader(
         test_dataset,
         batch_size=config.data.batch_size,
-        collate_fn=lambda b: NeedleDataset.collate_fn(b, config.env.patch_size),
+        collate_fn=collate_fn,
         num_workers=config.data.num_workers,
         sampler=RandomSampler(test_dataset, replacement=True, num_samples=int(1e10)),
         shuffle=False,

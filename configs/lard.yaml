@@ -6,6 +6,7 @@ data:
   batch_size: 20
   num_workers: 2
   dataset: standard
+  fill_mode: resize # Either "resize" or "pad"
   path: ./.data/lard_dataset/lard/1.0.0/
 model:
   n_channels: [3, 5, 10, 15, 20, 25]
