@@ -11,7 +11,7 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .draw import draw_image_prediction
+from .draw import draw_gif_prediction, draw_image_prediction
 from .env import NeedleEnv
 from .model import GRUPolicy
 from .transform import random_horizontal_flip
@@ -235,9 +235,16 @@ class Reinforce:
                 if step_id % self.plot_every == 0:
                     # Log the trajectories on a batch of images.
                     plots = self.get_predictions(train_iter, augment=True)
-                    metrics["trajectories/train"] = wandb.Image(plots / 255)
+                    metrics["trajectories/train-images"] = wandb.Image(plots / 255)
+                    metrics["trajectories/train-gif"] = wandb.Video(
+                        "trajectory.gif", fps=2, format="gif"
+                    )
+
                     plots = self.get_predictions(test_iter, augment=False)
                     metrics["trajectories/test"] = wandb.Image(plots / 255)
+                    metrics["trajectories/test-gif"] = wandb.Video(
+                        "trajectory.gif", fps=2, format="gif"
+                    )
 
                     self.checkpoint(step_id)
 
@@ -334,6 +341,13 @@ class Reinforce:
             )
         ]
         images = torch.stack(images, dim=0)
+
+        draw_gif_prediction(
+            env.images[0],
+            positions[0][masks[0]],
+            env.bboxes.to_tensor()[0],
+            env.patch_size,
+        )
         return images
 
     def checkpoint(self, step_id: int):
