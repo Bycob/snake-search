@@ -1,36 +1,8 @@
-from enum import Enum
-
 import einops
 import gymnasium as gym
 import torch
 from kornia.geometry.boxes import Boxes
 from torch import Tensor
-
-# Define the available actions.
-_ACTIONS = [
-    "START",
-    "LEFT",
-    "RIGHT",
-    "UP",
-    "DOWN",
-    "LEFT_UP",
-    "RIGHT_UP",
-    "LEFT_DOWN",
-    "RIGHT_DOWN",
-    "STOP",
-]
-Action = Enum("Action", _ACTIONS, start=0)
-
-MOVES = [
-    Action.LEFT,
-    Action.RIGHT,
-    Action.UP,
-    Action.DOWN,
-    Action.LEFT_UP,
-    Action.RIGHT_UP,
-    Action.LEFT_DOWN,
-    Action.RIGHT_DOWN,
-]
 
 
 class NeedleEnv(gym.Env):
@@ -78,8 +50,13 @@ class NeedleEnv(gym.Env):
             high=1,
             shape=(self.batch_size, self.n_channels, self.patch_size, self.patch_size),
         )
-        # Vertical and horizontal movements along with the diagonals.
-        self.action_space = gym.spaces.Discrete(len(Action))
+        # Vertical and horizontal movements.
+        self.action_space = gym.spaces.Tuple(
+            (
+                gym.spaces.Discrete(self.n_vertical_patches),
+                gym.spaces.Discrete(self.n_horizontal_patches),
+            )
+        )
 
         # Bounding boxes of the images.
         self.bbox_masks = self.convert_bboxes_to_masks(bboxes)
@@ -219,14 +196,6 @@ class NeedleEnv(gym.Env):
         self.positions = self.positions + movements
         self.positions[:, 0] = self.positions[:, 0] % self.n_vertical_patches
         self.positions[:, 1] = self.positions[:, 1] % self.n_horizontal_patches
-        #
-        # # Clamp the positions to the image boundaries.
-        # self.positions[:, 0] = torch.clamp(
-        #     self.positions[:, 0], min=0, max=self.n_vertical_patches - 1
-        # )
-        # self.positions[:, 1] = torch.clamp(
-        #     self.positions[:, 1], min=0, max=self.n_horizontal_patches - 1
-        # )
 
     @property
     def tiles_reached(self) -> Tensor:
@@ -330,154 +299,6 @@ class NeedleEnv(gym.Env):
     def max_scores(self) -> Tensor:
         """Compute the maximum possible score of each agent."""
         return self.bbox_masks.sum(dim=(1, 2))
-
-    @property
-    def closest_bbox_coord(self) -> Tensor:
-        """Find the coordinates of the closest non-visited bbox
-        for each agent.
-
-        ---
-        Returns:
-            The closest bbox coordinates.
-                Shape of [batch_size, 2].
-        """
-        visited_bboxes = self.bbox_masks & self.visited_patches
-        nonvisited_bboxes = self.bbox_masks & ~visited_bboxes
-
-        # Build a map of coordinates to compute the distances.
-        # It is of shape [n_vertical_patches, n_horizontal_patches, 2].
-        y = torch.arange(start=0, end=self.n_vertical_patches, device=self.device)
-        x = torch.arange(start=0, end=self.n_horizontal_patches, device=self.device)
-        coordinates = torch.cartesian_prod(y, x)
-        coordinates = einops.rearrange(
-            coordinates, "(h w) c -> h w c", h=self.n_vertical_patches
-        )
-        # coordinates = torch.stack(torch.meshgrid(y, x, indexing="ij"), dim=-1)
-
-        # Compute the absolute distances between the agents and the bboxes.
-        # It is of shape [batch_size, n_vertical_patches x n_horizontal_patches].
-        coordinates = einops.rearrange(coordinates, "(b h) w c -> b (h w) c", b=1)
-        positions = einops.rearrange(self.positions, "b (p c) -> b p c", p=1)
-        distances = torch.cdist(coordinates.float(), positions.float(), p=1)
-        distances = distances.squeeze(dim=-1)
-
-        # Ignore distances that are not about non-visited bboxes.
-        nonvisited_bboxes = einops.rearrange(nonvisited_bboxes, "b h w -> b (h w)")
-        distances.masked_fill_(~nonvisited_bboxes, float("+inf"))
-
-        # Find the closest non-visited bbox.
-        # It is of shape [batch_size, 2].
-        closest_bbox_patch_id = torch.argmin(distances, dim=-1)
-        closest_bbox_patch_coord = torch.stack(
-            [
-                closest_bbox_patch_id // self.n_horizontal_patches,
-                closest_bbox_patch_id % self.n_horizontal_patches,
-            ],
-            dim=1,
-        )
-        return closest_bbox_patch_coord
-
-    @property
-    def best_actions(self) -> Tensor:
-        """Find the actions that move the agents towards
-        their closest non-visited bbox patch.
-
-        ---
-        Returns:
-            The best actions.
-                Shape of [batch_size,].
-        """
-        directions = self.closest_bbox_coord - self.positions
-        movements = torch.sign(directions)
-        actions = NeedleEnv.parse_movements(movements)
-        return actions
-
-    def init_sample(self) -> dict[str, Tensor]:
-        sample = {
-            "patches": torch.zeros(
-                (
-                    self.max_ep_len,
-                    self.batch_size,
-                    self.n_channels,
-                    self.patch_size,
-                    self.patch_size,
-                ),
-                dtype=torch.float,
-                device=self.device,
-            ),
-            "actions_taken": torch.zeros(
-                (self.max_ep_len, self.batch_size), dtype=torch.long, device=self.device
-            ),
-            "best_actions": torch.zeros(
-                (self.max_ep_len, self.batch_size), dtype=torch.long, device=self.device
-            ),
-            "positions": torch.zeros(
-                (self.max_ep_len, self.batch_size, 2),
-                dtype=torch.long,
-                device=self.device,
-            ),
-            "rewards": torch.zeros(
-                (self.max_ep_len, self.batch_size),
-                dtype=torch.float,
-                device=self.device,
-            ),
-            "masks": torch.zeros(
-                (self.max_ep_len, self.batch_size), dtype=torch.bool, device=self.device
-            ),
-        }
-        return sample
-
-    def generate_sample(self) -> dict[str, Tensor]:
-        """Simulate a full episode and return the results.
-
-        ---
-        Returns:
-            A dictionary containing the following keys:
-                * patches: The patches visited by the agents.
-                    Shape of [batch_size, max_ep_len, n_channels, patch_size, patch_size].
-                * positions: The positions of the agents.
-                    Shape of [batch_size, max_ep_len, 2].
-                * actions_taken: The actions taken by the agents at step $i - 1$ to
-                    reach the patches at step $i$.
-                    Shape of [batch_size, max_ep_len].
-                * best_actions: The best actions to take at step $i$ when facing the
-                    patches at step $i$.
-                    Shape of [batch_size, max_ep_len].
-                * rewards: The rewards obtained by the agents at step $i$, after taking
-                    its actions.
-                    Shape of [batch_size, max_ep_len].
-                * masks: The masks indicating whether the episode is terminated or not.
-                    It indicates the padding of the tensors.
-                    Shape of [batch_size, max_ep_len].
-        """
-        sample = self.init_sample()
-        patches, infos = self.reset()
-        best_actions = (
-            torch.zeros(self.batch_size, dtype=torch.long, device=self.device)
-            * Action.START.value
-        )
-        terminated = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device)
-
-        for step_id in range(self.max_ep_len):
-            # Save the current state.
-            sample["patches"][step_id] = patches
-            sample["positions"][step_id] = infos["positions"]
-            sample["actions_taken"][step_id] = best_actions
-            sample["masks"][step_id] = ~terminated
-
-            # Play the best action.
-            best_actions = self.best_actions
-            patches, rewards, terminated, _, infos = self.step(best_actions)
-
-            # Save the results of the taken action.
-            sample["best_actions"][step_id] = best_actions
-            sample["rewards"][step_id] = rewards
-
-        # Swap the dimensions `batch_size` and `max_ep_len`.
-        for key, value in sample.items():
-            sample[key] = value.transpose(0, 1)
-
-        return sample
 
     def convert_bboxes_to_masks(self, bboxes: Boxes) -> Tensor:
         """Convert the bounding boxes to masks.
@@ -626,85 +447,3 @@ class NeedleEnv(gym.Env):
                 )
 
         return tensor_bboxes, masks
-
-    @staticmethod
-    def parse_actions(actions: Tensor) -> Tensor:
-        """Translate the action ids to actual position movements.
-        ---
-        Args:
-            actions: The actions to apply.
-                Shape of [batch_size,].
-        ---
-        Returns:
-            The movements to apply to the agents encoded as tuples `(delta_y, delta_x)`.
-                Shape of [batch_size, 2].
-        """
-        device = actions.device
-        movements = torch.zeros(
-            (actions.shape[0], 2),
-            dtype=torch.long,
-            device=device,
-        )
-
-        # Masks.
-        up = actions == Action.UP.value
-        down = actions == Action.DOWN.value
-        left = actions == Action.LEFT.value
-        right = actions == Action.RIGHT.value
-        left_up = actions == Action.LEFT_UP.value
-        right_up = actions == Action.RIGHT_UP.value
-        left_down = actions == Action.LEFT_DOWN.value
-        right_down = actions == Action.RIGHT_DOWN.value
-
-        # Up.
-        movements[up | left_up | right_up, 0] = -1
-        # Down.
-        movements[down | left_down | right_down, 0] = 1
-        # Right.
-        movements[right | right_up | right_down, 1] = 1
-        # Left.
-        movements[left | left_up | left_down, 1] = -1
-
-        return movements
-
-    @staticmethod
-    def parse_movements(movements: Tensor) -> Tensor:
-        """Translate the movements to action ids.
-
-        ---
-        Args:
-            movements: The movements to apply.
-                Shape of [batch_size, 2].
-
-        ---
-        Returns:
-            The corresponding action ids.
-                Shape of [batch_size,].
-        """
-        actions = torch.zeros(
-            (movements.shape[0],),
-            dtype=torch.long,
-            device=movements.device,
-        )
-
-        # Masks.
-        up = movements[:, 0] == -1
-        down = movements[:, 0] == 1
-        left = movements[:, 1] == -1
-        right = movements[:, 1] == 1
-        no_vertical = movements[:, 0] == 0
-        no_horizontal = movements[:, 1] == 0
-
-        # Horizontal and vertical movements.
-        actions[up & no_horizontal] = Action.UP.value
-        actions[down & no_horizontal] = Action.DOWN.value
-        actions[left & no_vertical] = Action.LEFT.value
-        actions[right & no_vertical] = Action.RIGHT.value
-
-        # Diagonal movements.
-        actions[up & left] = Action.LEFT_UP.value
-        actions[up & right] = Action.RIGHT_UP.value
-        actions[down & left] = Action.LEFT_DOWN.value
-        actions[down & right] = Action.RIGHT_DOWN.value
-
-        return actions

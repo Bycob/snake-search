@@ -5,36 +5,9 @@ To run the tests, use the following command:
 """
 import pytest
 import torch
-from torch import Tensor
 
 from ..dataset import NeedleDataset
-from .env import Action, NeedleEnv
-
-
-@pytest.mark.parametrize(
-    "actions, movements",
-    [
-        (
-            torch.LongTensor([Action.UP.value, Action.DOWN.value]),
-            torch.LongTensor([[-1, 0], [1, 0]]),
-        ),
-        (
-            torch.LongTensor([Action.LEFT.value, Action.RIGHT.value]),
-            torch.LongTensor([[0, -1], [0, 1]]),
-        ),
-        (
-            torch.LongTensor([Action.LEFT_UP.value, Action.RIGHT_DOWN.value]),
-            torch.LongTensor([[-1, -1], [1, 1]]),
-        ),
-        (
-            torch.LongTensor([Action.LEFT_DOWN.value, Action.RIGHT_UP.value]),
-            torch.LongTensor([[1, -1], [-1, 1]]),
-        ),
-    ],
-)
-def test_parse_actions(actions: Tensor, movements: Tensor):
-    assert torch.all(NeedleEnv.parse_actions(actions) == movements)
-    assert torch.all(NeedleEnv.parse_movements(movements) == actions)
+from .env import NeedleEnv
 
 
 def test_parse_bboxes():
@@ -151,8 +124,7 @@ def test_movements(batch_size: int, width: int, height: int, patch_size: int):
     env.positions = positions
 
     for _ in range(10):
-        actions = torch.randint(low=0, high=len(Action), size=(batch_size,))
-        movements = NeedleEnv.parse_actions(actions)
+        movements = torch.randint(low=-5, high=5, size=(batch_size, 2))
         env.step(movements)
 
         for batch_id, move in enumerate(movements):
@@ -188,51 +160,6 @@ def test_tiles_reached():
         ]
     )
     assert torch.all(env.tiles_reached == tiles_reached)
-
-
-def test_closest_bbox_coord_and_best_actions():
-    batch_size = 3
-    height, width = 30, 40
-    patch_size = 10
-    max_ep_len = 10
-    images = [torch.randn(3, height, width) for _ in range(batch_size)]
-    bboxes = [torch.LongTensor([[0, 0, 5, 22]]) for _ in range(batch_size)]
-    batch = [(image, bbox) for image, bbox in zip(images, bboxes)]
-    batch_images, batch_bboxes = NeedleDataset.collate_fn(batch, patch_size)
-    env = NeedleEnv(batch_images, batch_bboxes, patch_size, max_ep_len)
-
-    # With no visited patches.
-    env.positions = torch.LongTensor([[0, 1], [1, 2], [2, 3]])
-    env.visited_patches = torch.zeros_like(env.visited_patches, dtype=torch.bool)
-    closest_bbox_coord = torch.LongTensor(
-        [
-            [0, 0],
-            [1, 0],
-            [2, 0],
-        ]
-    )
-    assert torch.all(env.closest_bbox_coord == closest_bbox_coord)
-    best_actions = torch.LongTensor(
-        [Action.LEFT.value, Action.LEFT.value, Action.LEFT.value]
-    )
-    assert torch.all(env.best_actions == best_actions)
-
-    # With some visited patches.
-    env.visited_patches = torch.zeros_like(env.visited_patches, dtype=torch.bool)
-    env.visited_patches[0, 0, 0] = True
-    env.visited_patches[2, 2, 0] = True
-    closest_bbox_coord = torch.LongTensor(
-        [
-            [1, 0],
-            [1, 0],
-            [1, 0],
-        ]
-    )
-    assert torch.all(env.closest_bbox_coord == closest_bbox_coord)
-    best_actions = torch.LongTensor(
-        [Action.LEFT_DOWN.value, Action.LEFT.value, Action.LEFT_UP.value]
-    )
-    assert torch.all(env.best_actions == best_actions)
 
 
 def test_convert_bboxes_to_masks():
