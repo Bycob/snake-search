@@ -55,8 +55,6 @@ def draw_image_prediction(
     patch_size: int,
     image_width: int = 500,
 ) -> torch.Tensor:
-    device = image.device
-
     # Torch operations.
     image = image.permute(1, 2, 0)
     image = draw_positions(image, positions, patch_size)

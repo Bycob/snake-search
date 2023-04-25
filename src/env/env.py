@@ -217,14 +217,16 @@ class NeedleEnv(gym.Env):
                 Shape of [batch_size, 2].
         """
         self.positions = self.positions + movements
-
-        # Clamp the positions to the image boundaries.
-        self.positions[:, 0] = torch.clamp(
-            self.positions[:, 0], min=0, max=self.n_vertical_patches - 1
-        )
-        self.positions[:, 1] = torch.clamp(
-            self.positions[:, 1], min=0, max=self.n_horizontal_patches - 1
-        )
+        self.positions[:, 0] = self.positions[:, 0] % self.n_vertical_patches
+        self.positions[:, 1] = self.positions[:, 1] % self.n_horizontal_patches
+        #
+        # # Clamp the positions to the image boundaries.
+        # self.positions[:, 0] = torch.clamp(
+        #     self.positions[:, 0], min=0, max=self.n_vertical_patches - 1
+        # )
+        # self.positions[:, 1] = torch.clamp(
+        #     self.positions[:, 1], min=0, max=self.n_horizontal_patches - 1
+        # )
 
     @property
     def tiles_reached(self) -> Tensor:

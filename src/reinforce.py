@@ -14,6 +14,7 @@ from tqdm import tqdm
 from .draw import draw_image_prediction
 from .env import NeedleEnv
 from .model import GRUPolicy
+from .transform import random_horizontal_flip
 
 
 class Reinforce:
@@ -56,13 +57,15 @@ class Reinforce:
 
     @torch.no_grad()
     def augment_batch(
-        self, images: torch.Tensor, bboxes: torch.Tensor
+        self, images: torch.Tensor, bboxes: Boxes
     ) -> tuple[torch.Tensor, Boxes]:
         """Apply augmentations to a batch of images and bboxes."""
-        image_dtype = images.dtype
-        images = images.to(bboxes.dtype)
-        images, bboxes = self.augmentations(images, bboxes)
-        images = images.to(image_dtype)
+        # image_dtype = images.dtype
+        # images = images.to(bboxes.dtype)
+        # images, bboxes = self.augmentations(images, bboxes)
+        # images = images.to(image_dtype)
+        # return images, bboxes
+        images, bboxes = random_horizontal_flip(images, bboxes, p=0.5)
         return images, bboxes
 
     def sample_from_logits(
@@ -184,6 +187,7 @@ class Reinforce:
         Args:
             group: The name of the group of experiments.
             config: A dictionary of hyperparameters.
+            mode: The mode of the Weights & Biases run.
         """
         print(f"Launching REINFORCE on device {self.device}")
         print(f"Training dataset size: {len(self.train_loader.dataset):,}")
