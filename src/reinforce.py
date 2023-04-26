@@ -238,17 +238,19 @@ class Reinforce:
                     env = self.load_env(train_iter, augment=True)
                     positions, masks = self.predict(env)
                     plots = self.plot_trajectories(env, positions, masks)
+                    gifs = self.animate_trajectories(env, positions[:1], masks)
                     metrics["trajectories/train"] = wandb.Image(plots / 255)
                     metrics["trajectories/train-gif"] = wandb.Video(
-                        "trajectory.gif", fps=2, format="gif"
+                        gifs[0], fps=2, format="gif"
                     )
 
                     env = self.load_env(test_iter, augment=False)
                     positions, masks = self.predict(env)
                     plots = self.plot_trajectories(env, positions, masks)
+                    gifs = self.animate_trajectories(env, positions[:1], masks)
                     metrics["trajectories/test"] = wandb.Image(plots / 255)
-                    metrics["trajectories/test-gif"] = wandb.Video(
-                        "trajectory.gif", fps=2, format="gif"
+                    metrics["trajectories/train-gif"] = wandb.Video(
+                        gifs[0] / 255, fps=2, format="gif"
                     )
 
                     self.checkpoint(step_id)
@@ -367,7 +369,7 @@ class Reinforce:
 
         return images
 
-    def animate_trajectories(self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+    def animate_trajectories(self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor) -> list[torch.Tensor]:
         """Make a gif from the trajectories of the model on a batch of images.
 
         ---
@@ -379,17 +381,15 @@ class Reinforce:
                 Shape of [batch_size, max_ep_len + 1].
         ---
         Returns:
-            The images of all predicted trajectories of the model.
-                Shape of [batch_size, max_ep_len + 1, 3, height, width].
+            The gifs generated from the given trajectories.
+                List of tensors of shape [max_ep_len + 1, 3, height, width].
         """
         gifs = [
             draw_gif_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
                 env.images, positions, masks, env.bboxes.to_tensor()
-            )
-
-                ]
-        gifs = torch.stack(gifs, dim=0)
+                )
+        ]
         return gifs
 
     def checkpoint(self, step_id: int):
