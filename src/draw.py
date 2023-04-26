@@ -96,7 +96,7 @@ def draw_gif_prediction(
     bboxes: torch.Tensor,
     patch_size: int,
     image_width: int = 500,
-):
+) -> torch.Tensor:
     def draw_image(
         image: torch.Tensor,
         previous_positions: torch.Tensor,
@@ -138,7 +138,10 @@ def draw_gif_prediction(
             (image_width, image_height), resample=Image.BILINEAR
         )
 
-        return np.array(pil_image)
+        image = torch.from_numpy(np.array(pil_image))
+        image = image.permute(2, 0, 1)
+        image = image.type(torch.uint8)
+        return image
 
     image = image.permute(1, 2, 0)
 
@@ -157,4 +160,4 @@ def draw_gif_prediction(
         )
         gif.append(frame)
 
-    imageio.mimwrite("trajectory.gif", gif, duration=500)
+    return torch.stack(gif)
