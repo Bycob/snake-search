@@ -239,18 +239,18 @@ class Reinforce:
                     positions, masks = self.predict(env)
                     plots = self.plot_trajectories(env, positions, masks)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
-                    metrics["trajectories/train"] = wandb.Image(plots / 255)
+                    metrics["trajectories/train-images"] = wandb.Image(plots / 255)
                     metrics["trajectories/train-gif"] = wandb.Video(
-                        gifs[0], fps=2, format="gif"
+                        gifs[0].numpy(), fps=4
                     )
 
                     env = self.load_env(test_iter, augment=False)
                     positions, masks = self.predict(env)
                     plots = self.plot_trajectories(env, positions, masks)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
-                    metrics["trajectories/test"] = wandb.Image(plots / 255)
-                    metrics["trajectories/train-gif"] = wandb.Video(
-                        gifs[0] / 255, fps=2, format="gif"
+                    metrics["trajectories/test-images"] = wandb.Image(plots / 255)
+                    metrics["trajectories/test-gif"] = wandb.Video(
+                        gifs[0].numpy(), fps=4
                     )
 
                     self.checkpoint(step_id)
@@ -284,7 +284,7 @@ class Reinforce:
         iter_loader: Iterator,
         n_predictions: int = 16,
         augment: bool = False,
-        ) -> NeedleEnv:
+    ) -> NeedleEnv:
         """Sample from the loader and make predictions on the sampled images."""
         images, bboxes = next(iter_loader)
         images, bboxes = images.to(self.device), bboxes.to(self.device)
@@ -344,7 +344,9 @@ class Reinforce:
 
         return positions, masks
 
-    def plot_trajectories(self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+    def plot_trajectories(
+        self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor
+    ) -> torch.Tensor:
         """Plot the trajectories of the model on a batch of images.
 
         ---
@@ -369,7 +371,9 @@ class Reinforce:
 
         return images
 
-    def animate_trajectories(self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor) -> list[torch.Tensor]:
+    def animate_trajectories(
+        self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor
+    ) -> list[torch.Tensor]:
         """Make a gif from the trajectories of the model on a batch of images.
 
         ---
@@ -388,7 +392,7 @@ class Reinforce:
             draw_gif_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
                 env.images, positions, masks, env.bboxes.to_tensor()
-                )
+            )
         ]
         return gifs
 
