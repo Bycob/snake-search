@@ -234,9 +234,11 @@ class Reinforce:
 
                 if step_id % self.plot_every == 0:
                     # Log the trajectories on a batch of images.
-                    plots = self.get_predictions(train_iter, augment=True)
+                    env = self.load_env(train_iter, augment=True)
+                    positions, masks = self.predict(env)
                     metrics["trajectories/train"] = wandb.Image(plots / 255)
-                    plots = self.get_predictions(test_iter, augment=False)
+                    env = self.load_env(test_iter, augment=False)
+                    plots = self.predict(env)
                     metrics["trajectories/test"] = wandb.Image(plots / 255)
 
                     self.checkpoint(step_id)
@@ -265,12 +267,12 @@ class Reinforce:
 
         return {key: torch.stack(values).mean() for key, values in all_metrics.items()}
 
-    def get_predictions(
+    def load_env(
         self,
         iter_loader: Iterator,
         n_predictions: int = 16,
         augment: bool = False,
-    ) -> torch.Tensor:
+        ) -> NeedleEnv:
         """Sample from the loader and make predictions on the sampled images."""
         images, bboxes = next(iter_loader)
         images, bboxes = images.to(self.device), bboxes.to(self.device)
@@ -279,11 +281,10 @@ class Reinforce:
         if augment:
             images, bboxes = self.augment_batch(images, bboxes)
         env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
-        plots = self.predict(env)
-        return plots
+        return env
 
     @torch.no_grad()
-    def predict(self, env: NeedleEnv) -> torch.Tensor:
+    def predict(self, env: NeedleEnv) -> tuple[torch.Tensor, torch.Tensor]:
         """Evaluates the model on a batch of images.
         Return a plot of its trajectories on all images.
 
@@ -293,8 +294,10 @@ class Reinforce:
 
         ---
         Returns:
-            The images of all predicted trajectories of the model.
-                Shape of [batch_size, 3, height, width].
+            positions: The positions visited by the model.
+                Shape of [batch_size, max_ep_len + 1, 2].
+            masks: The masks of the visited positions.
+                Shape of [batch_size, max_ep_len + 1].
         """
         self.model.eval()
         memory = None
@@ -327,6 +330,23 @@ class Reinforce:
         masks = torch.roll(masks, shifts=1, dims=(1,))
         masks[:, 0] = True
 
+        return positions, masks
+
+    def plot_trajectories(self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        """Plot the trajectories of the model on a batch of images.
+
+        ---
+        Args:
+            env: The environment used to generate the trajectories.
+            positions: The positions visited by the model.
+                Shape of [batch_size, max_ep_len + 1, 2].
+            masks: The masks of the visited positions.
+                Shape of [batch_size, max_ep_len + 1].
+        ---
+        Returns:
+            The images of all predicted trajectories of the model.
+                Shape of [batch_size, 3, height, width].
+        """
         images = [
             draw_image_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
@@ -335,6 +355,23 @@ class Reinforce:
         ]
         images = torch.stack(images, dim=0)
         return images
+
+    def animate_trajectories(self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        """Make a gif from the trajectories of the model on a batch of images.
+
+        ---
+        Args:
+            env: The environment used to generate the trajectories.
+            positions: The positions visited by the model.
+                Shape of [batch_size, max_ep_len + 1, 2].
+            masks: The masks of the visited positions.
+                Shape of [batch_size, max_ep_len + 1].
+        ---
+        Returns:
+            The images of all predicted trajectories of the model.
+                Shape of [batch_size, max_ep_len + 1, 3, height, width].
+        """
+        pass
 
     def checkpoint(self, step_id: int):
         """Save the model's parameters."""
