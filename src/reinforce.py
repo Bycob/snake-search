@@ -238,19 +238,21 @@ class Reinforce:
                     env = self.load_env(train_iter, augment=True)
                     positions, masks = self.predict(env)
                     plots = self.plot_trajectories(env, positions, masks)
-                    gifs = self.animate_trajectories(env, positions[:1], masks)
                     metrics["trajectories/train-images"] = wandb.Image(plots / 255)
+                    gifs = self.animate_trajectories(env, positions[:1], masks)
+                    self.tensor_to_gif(gifs[0], "train.gif")
                     metrics["trajectories/train-gif"] = wandb.Video(
-                        gifs[0].numpy(), fps=4
+                        "train.gif", fps=3, format="gif"
                     )
 
                     env = self.load_env(test_iter, augment=False)
                     positions, masks = self.predict(env)
                     plots = self.plot_trajectories(env, positions, masks)
-                    gifs = self.animate_trajectories(env, positions[:1], masks)
                     metrics["trajectories/test-images"] = wandb.Image(plots / 255)
+                    gifs = self.animate_trajectories(env, positions[:1], masks)
+                    self.tensor_to_gif(gifs[0], "test.gif")
                     metrics["trajectories/test-gif"] = wandb.Video(
-                        gifs[0].numpy(), fps=4
+                        "test.gif", fps=3, format="gif"
                     )
 
                     self.checkpoint(step_id)
@@ -395,6 +397,21 @@ class Reinforce:
             )
         ]
         return gifs
+
+    @staticmethod
+    def tensor_to_gif(frames: torch.Tensor, filename: str):
+        """Build a gif from a tensor of images.
+
+        ---
+        Args:
+            frames: The tensor of images.
+                Shape of [n_frames, 3, height, width].
+            filename: The name of the gif file.
+        """
+        import imageio
+
+        frames = frames.permute(0, 2, 3, 1).cpu().numpy()
+        imageio.mimsave(filename, frames, duration=1000 / 3)
 
     def checkpoint(self, step_id: int):
         """Save the model's parameters."""
