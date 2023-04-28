@@ -49,11 +49,11 @@ class Reinforce:
         self.checkpoint_dir = Path("checkpoints")
         self.checkpoint_dir.mkdir(exist_ok=True)
 
-        self.augmentations = aug.AugmentationSequential(
-            aug.RandomHorizontalFlip(p=0.5),
-            aug.RandomAffine(degrees=5, translate=(1 / 4, 1 / 3), p=0.5),
-            data_keys=["input", "bbox"],
-        )
+        # self.augmentations = aug.AugmentationSequential(
+        #     aug.RandomHorizontalFlip(p=0.5),
+        #     aug.RandomAffine(degrees=5, translate=(1 / 4, 1 / 3), p=0.5),
+        #     data_keys=["input", "bbox"],
+        # )
 
     @torch.no_grad()
     def augment_batch(
@@ -241,9 +241,9 @@ class Reinforce:
                     metrics["trajectories/train-images"] = wandb.Image(plots / 255)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
                     self.tensor_to_gif(gifs[0], "train.gif")
-                    metrics["trajectories/train-gif"] = wandb.Video(
-                        "train.gif", fps=3, format="gif"
-                    )
+                    # metrics["trajectories/train-gif"] = wandb.Video(
+                    #     "train.gif", fps=3, format="gif"
+                    # )
 
                     env = self.load_env(test_iter, augment=False)
                     positions, masks = self.predict(env)
@@ -251,9 +251,9 @@ class Reinforce:
                     metrics["trajectories/test-images"] = wandb.Image(plots / 255)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
                     self.tensor_to_gif(gifs[0], "test.gif")
-                    metrics["trajectories/test-gif"] = wandb.Video(
-                        "test.gif", fps=3, format="gif"
-                    )
+                    # metrics["trajectories/test-gif"] = wandb.Video(
+                    #     "test.gif", fps=3, format="gif"
+                    # )
 
                     self.checkpoint(step_id)
 
