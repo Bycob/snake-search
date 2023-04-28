@@ -1,34 +1,39 @@
 from typing import Optional
 
+import einops
 import torch
 import torch.nn as nn
 
 
-class CNNEncoder(nn.Module):
-    def __init__(self, n_channels: list[int], kernels: list[int], maxpools: list[bool]):
+class ViTEncoder(nn.Module):
+    def __init__(
+        self, n_channels: int, embedding_size: int, n_tokens: int, image_size: int
+    ):
         super().__init__()
-
+        self.embedding_size = embedding_size
         assert (
-            len(n_channels) == len(kernels) + 1
-        ), "The number of layers is not consistent."
+            image_size % n_tokens == 0
+        ), "The image size is not a multiple of n_tokens."
+        kernel_size = image_size // n_tokens
 
-        self.conv_layers = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Conv2d(
-                        in_channels=n_channels[layer_id],
-                        out_channels=n_channels[layer_id + 1],
-                        kernel_size=kernels[layer_id],
-                        padding=kernels[layer_id] // 2,
-                    ),
-                    nn.GELU(),
-                    nn.GroupNorm(num_groups=1, num_channels=n_channels[layer_id + 1]),
-                    nn.MaxPool2d(kernel_size=2, stride=2)
-                    if maxpools[layer_id]
-                    else nn.Identity(),
-                )
-                for layer_id in range(len(kernels))
-            ]
+        self.project = nn.Sequential(
+            nn.Conv2d(
+                in_channels=n_channels,
+                out_channels=embedding_size,
+                kernel_size=kernel_size,
+                stride=kernel_size,
+            ),
+            nn.GELU(),
+            nn.LayerNorm([embedding_size, n_tokens, n_tokens]),
+        )
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=nn.TransformerEncoderLayer(
+                d_model=embedding_size,
+                nhead=4,
+                dim_feedforward=2 * embedding_size,
+                dropout=0.1,
+            ),
+            num_layers=3,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -42,21 +47,22 @@ class CNNEncoder(nn.Module):
         ---
         Returns:
             The encoded image.
-                Shape of [batch_size, num_channels, height, width].
+                Shape of [batch_size, embedding_size].
         """
-        for layer in self.conv_layers:
-            x = layer(x)
+        x = self.project(x)
+        x = einops.rearrange(x, "b c h w -> b (h w) c")
+        x = self.encoder(x)
+        x = x.mean(dim=1)
         return x
 
 
 class GRUPolicy(nn.Module):
     def __init__(
         self,
-        n_channels: list[int],
-        kernels: list[int],
-        maxpools: list[bool],
+        n_channels: int,
+        patch_size: int,
+        n_tokens: int,
         embedding_size: int,
-        n_layers_mlp: int,
         gru_hidden_size: int,
         gru_num_layers: int,
         jump_size: int,
@@ -65,24 +71,12 @@ class GRUPolicy(nn.Module):
         self.jump_size = jump_size
 
         self.jumps_encoder = nn.Embedding(2 * jump_size + 1, embedding_size)
-        self.direction_encoder = nn.Embedding(2, embedding_size)
         self.project_encoded_actions = nn.Linear(2 * embedding_size, embedding_size)
-        self.cnn_encoder = CNNEncoder(n_channels, kernels, maxpools)
-        self.project = nn.Sequential(
-            nn.Flatten(start_dim=1),
-            nn.LazyLinear(embedding_size),
-            nn.GELU(),
-            nn.LayerNorm(embedding_size),
-        )
-        self.mlp = nn.Sequential(
-            *[
-                nn.Sequential(
-                    nn.Linear(embedding_size, embedding_size),
-                    nn.GELU(),
-                    nn.LayerNorm(embedding_size),
-                )
-                for _ in range(n_layers_mlp)
-            ]
+        self.vit_encoder = ViTEncoder(
+            n_channels=n_channels,
+            embedding_size=embedding_size,
+            n_tokens=n_tokens,
+            image_size=patch_size,
         )
         self.gru = nn.GRU(
             input_size=embedding_size,
@@ -97,6 +91,18 @@ class GRUPolicy(nn.Module):
         )
 
     def encode_actions(self, actions: torch.Tensor) -> torch.Tensor:
+        """Encode the actions.
+
+        ---
+        Args:
+            actions: The actions to encode.
+                Shape of [batch_size, 2].
+
+        ---
+        Returns:
+            The encoded actions.
+                Shape of [batch_size, embedding_size].
+        """
         delta_x = actions[:, 0]
         delta_y = actions[:, 1]
 
@@ -134,12 +140,12 @@ class GRUPolicy(nn.Module):
                 Shape of [gru_num_layers, batch_size, gru_hidden_size].
         """
         # Project the image to [batch_size, embedding_size].
-        x = self.cnn_encoder(x)
-        x = self.project(x)
+        # x = self.cnn_encoder(x)
+        # x = self.project(x)
+        x = self.vit_encoder(x)
 
         # Add the action embeddings.
         x = x + self.encode_actions(actions)
-        x = self.mlp(x)
 
         # Run the GRU.
         x = x.unsqueeze(0)  # Add a fictive time dimension.

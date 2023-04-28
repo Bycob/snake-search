@@ -9,11 +9,9 @@ data:
   fill_mode: resize # Either "resize" or "pad"
   path: ./.data
 model:
-  n_channels: [3, 5, 10, 25]
-  kernels: [3, 3, 3]
-  maxpools: [true, true, true]
+  n_channels: 3
+  n_tokens: 2
   embedding_size: 64
-  n_layers_mlp: 1
   gru_hidden_size: 44
   gru_num_layers: 4
   jump_size: 1
