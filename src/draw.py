@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw
 
 
 def draw_grid(draw: ImageDraw.ImageDraw, patch_size: int):
+    """Draw a grid on the image."""
     width, height = draw.im.size
 
     for x in range(0, width, patch_size):
@@ -13,6 +14,7 @@ def draw_grid(draw: ImageDraw.ImageDraw, patch_size: int):
 
 
 def draw_bbox(draw: ImageDraw.ImageDraw, bbox: torch.Tensor, color: str = "green"):
+    """Draw a bounding box on the image."""
     bbox = bbox.cpu().numpy()
     draw.rectangle(
         (bbox[0], bbox[1], bbox[2], bbox[3]),
@@ -28,6 +30,23 @@ def draw_positions(
     min_range: float = 0.3,
     max_range: float = 1.0,
 ) -> torch.Tensor:
+    """Draw in red the patches visited by the agent.
+    The red color is proportional to the patch index.
+
+    ---
+    Args:
+        image: The image.
+            Shape of [n_channels, height, width].
+        positions: The positions of the patches.
+            Shape of [n_patches, 2 (y, x)].
+        min_range: The minimum value of the red color.
+        max_range: The maximum value of the red color.
+
+    ---
+    Returns:
+        The drawn image.
+            Shape of [n_channels, height, width].
+    """
     assert 0 <= min_range <= max_range <= 1
 
     positions = positions * patch_size  # To pixel coordinates.
@@ -61,6 +80,24 @@ def draw_image_prediction(
     patch_size: int,
     image_width: int = 500,
 ) -> torch.Tensor:
+    """Draw onto the image the agent predictions.
+
+    ---
+    Args:
+        image: The image.
+            Shape of [n_channels, height, width].
+        positions: The positions of the patches.
+            Shape of [n_patches, 2 (y, x)].
+        bboxes: The bounding boxes of the objects.
+            Shape of [n_bboxes,  4 (y_min, x_min, y_max, x_max)].
+        patch_size: The size of the patches.
+        image_width: The width of the output frames (resize).
+
+    ---
+    Returns:
+        The drawn image.
+            Shape of [n_channels, height, width].
+    """
     image = image.clone()
 
     # Torch operations.
@@ -96,6 +133,24 @@ def draw_gif_prediction(
     patch_size: int,
     image_width: int = 500,
 ) -> torch.Tensor:
+    """Draw a gif of the prediction.
+
+    ---
+    Args:
+        image: The image.
+            Shape of [n_channels, height, width].
+        positions: The positions of the patches.
+            Shape of [n_patches, 2 (y, x)].
+        bboxes: The bounding boxes of the objects.
+            Shape of [n_bboxes,  4 (y_min, x_min, y_max, x_max)].
+        patch_size: The size of the patches.
+        image_width: The width of the output frames (resize).
+
+    ---
+    Returns:
+        The gif as a batch of frames.
+            Shape of [n_frames, n_channels, height, width].
+    """
     def draw_image(
         image: torch.Tensor,
         previous_positions: torch.Tensor,
@@ -104,6 +159,9 @@ def draw_gif_prediction(
         patch_size: int,
         image_width: int,
     ) -> np.ndarray:
+        """Draw a frame of the gif, similar to `draw_image_prediction`,
+        but with better patch colorization.
+        """
         image = image.clone()
 
         # Torch operations.
@@ -111,8 +169,8 @@ def draw_gif_prediction(
             image,
             previous_positions,
             patch_size,
-            min_range=0.1,
-            max_range=0.1,
+            min_range=0.3,
+            max_range=0.3,
         )
         image = draw_positions(
             image,
