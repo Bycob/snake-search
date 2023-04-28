@@ -151,6 +151,7 @@ def draw_gif_prediction(
         The gif as a batch of frames.
             Shape of [n_frames, n_channels, height, width].
     """
+
     def draw_image(
         image: torch.Tensor,
         previous_positions: torch.Tensor,
