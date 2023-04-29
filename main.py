@@ -94,8 +94,9 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
     model = GRUPolicy(
         n_channels=config.model.n_channels,
         patch_size=config.env.patch_size,
-        n_tokens=config.model.n_tokens,
-        embedding_size=config.model.embedding_size,
+        vit_num_tokens=config.model.vit_num_tokens,
+        vit_hidden_size=config.model.vit_hidden_size,
+        vit_num_layers=config.model.vit_num_layers,
         gru_hidden_size=config.model.gru_hidden_size,
         gru_num_layers=config.model.gru_num_layers,
         jump_size=config.model.jump_size,

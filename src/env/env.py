@@ -313,11 +313,11 @@ class NeedleEnv(gym.Env):
                 contains at least a bounding box.
                 Shape of [batch_size, n_vertical_patches, n_horizontal_patches].
         """
-        masks = bboxes.to_mask(self.height, self.width)
+        masks = bboxes.to_mask(self.height, self.width).long()
         masks = masks.max(dim=1).values  # Merge the channels.
 
         # Logical OR of the masks, to reduce to the patch dimensions.
-        masks = torch.nn.functional.max_pool2d(masks, self.patch_size)
+        masks = torch.nn.functional.max_pool2d(masks.float(), self.patch_size)
         return masks.bool()
 
     def parse_bboxes(self, bboxes: list[Tensor]) -> tuple[Tensor, Tensor]:

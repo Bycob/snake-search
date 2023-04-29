@@ -3,19 +3,18 @@ env:
   patch_size: 224
   max_ep_len: 40
 data:
-  batch_size: 20
-  num_workers: 2
+  batch_size: 32
+  num_workers: 0
   dataset: standard
   fill_mode: resize # Either "resize" or "pad"
   path: ./.data/lard_dataset/lard/1.0.0/
 model:
-  n_channels: [3, 5, 10, 15, 20, 25]
-  kernels: [5, 5, 5, 5, 3]
-  maxpools: [true, true, true, true, true]
-  embedding_size: 128
-  n_layers_mlp: 4
-  gru_hidden_size: 92
-  gru_num_layers: 4
+  n_channels: 3
+  vit_num_tokens: 7
+  vit_hidden_size: 16
+  vit_num_layers: 3
+  gru_hidden_size: 16
+  gru_num_layers: 2
   jump_size: 1
 optimizer:
   learning_rate: 1.0e-5
