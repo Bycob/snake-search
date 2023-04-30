@@ -22,7 +22,7 @@ class ViTEncoder(nn.Module):
         ), "The image size is not a multiple of n_tokens."
         kernel_size = image_size // n_tokens
 
-        self.project = nn.Sequential(
+        self.tokenize = nn.Sequential(
             nn.Conv2d(
                 in_channels=n_channels,
                 out_channels=hidden_size,
@@ -42,7 +42,7 @@ class ViTEncoder(nn.Module):
             ),
             num_layers=n_layers,
         )
-        self.project = nn.Linear(hidden_size, output_size)
+        self.project_output = nn.Linear(hidden_size, output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Encode the image.
@@ -57,13 +57,13 @@ class ViTEncoder(nn.Module):
             The encoded image.
                 Shape of [batch_size, output_size].
         """
-        x = self.project(x)
+        x = self.tokenize(x)
         x = einops.rearrange(x, "b c h w -> b h w c")
         x = self.positional_encoding(x) + x
         x = einops.rearrange(x, "b h w c -> b (h w) c")
         x = self.encoder(x)
         x = x.mean(dim=1)  # Average over the tokens.
-        x = self.project(x)
+        x = self.project_output(x)
         return x
 
 

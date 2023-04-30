@@ -11,17 +11,17 @@ data:
 model:
   n_channels: 3
   vit_num_tokens: 7
-  vit_hidden_size: 16
-  vit_num_layers: 3
-  gru_hidden_size: 16
-  gru_num_layers: 2
+  vit_hidden_size: 32
+  vit_num_layers: 5
+  gru_hidden_size: 24
+  gru_num_layers: 3
   jump_size: 1
 optimizer:
   learning_rate: 1.0e-5
 reinforce:
   n_iterations: 200000
-  log_every: 50
-  plot_every: 100
+  log_every: 100
+  plot_every: 500
 device: auto
 mode: online
 hydra:

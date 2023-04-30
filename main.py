@@ -77,6 +77,7 @@ def init_dataloaders(
         sampler=RandomSampler(train_dataset, replacement=True, num_samples=int(1e10)),
         shuffle=False,
         pin_memory=True,
+        prefetch_factor=1 if config.data.num_workers > 0 else None,
     )
     test_loader = DataLoader(
         test_dataset,
@@ -86,6 +87,7 @@ def init_dataloaders(
         sampler=RandomSampler(test_dataset, replacement=True, num_samples=int(1e10)),
         shuffle=False,
         pin_memory=True,
+        prefetch_factor=1 if config.data.num_workers > 0 else None,
     )
     return train_loader, test_loader
 
