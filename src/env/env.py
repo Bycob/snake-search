@@ -151,8 +151,6 @@ class NeedleEnv(gym.Env):
         previous_scores = self.scores
 
         # Apply the actions.
-        # movements = self.parse_actions(actions)
-        # self.apply_movements(movements)
         self.apply_movements(actions)
         self.visited_patches = self.visited_patches | self.tiles_reached
         self.steps += 1
@@ -164,14 +162,14 @@ class NeedleEnv(gym.Env):
         truncated = self.steps >= self.max_ep_len
 
         # Give a bonus reward for finishing the episode.
-        finishing_reward = self.max_ep_len - self.steps
         just_finished = self.terminated & (delta_rewards != 0)
-        finishing_reward.masked_fill_(~just_finished, 0)
+        # finishing_reward = self.max_ep_len - self.steps
+        # finishing_reward.masked_fill_(~just_finished, 0)
 
-        rewards = delta_rewards + 0 * finishing_reward
-        rewards = rewards / self.max_scores
-
-        percentages = new_scores / self.max_scores
+        max_scores = self.max_scores
+        max_scores.masked_fill_(max_scores == 0, 1)  # Avoid division by zero.
+        rewards = delta_rewards / max_scores
+        percentages = new_scores / max_scores
 
         infos = {
             "positions": self.positions,

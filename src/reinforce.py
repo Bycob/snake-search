@@ -7,6 +7,7 @@ import torch
 import wandb
 from kornia.geometry.boxes import Boxes
 from torch.distributions import Categorical
+from torch.nn.utils import clip_grad
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -220,6 +221,7 @@ class Reinforce:
 
                 self.optimizer.zero_grad()
                 metrics["loss"].backward()
+                clip_grad.clip_grad_value_(self.model.parameters(), 1)
                 self.optimizer.step()
 
                 metrics = dict()

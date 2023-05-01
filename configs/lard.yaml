@@ -3,7 +3,7 @@ env:
   patch_size: 224
   max_ep_len: 40
 data:
-  batch_size: 32
+  batch_size: 42
   num_workers: 0
   dataset: standard
   fill_mode: resize # Either "resize" or "pad"
@@ -11,13 +11,13 @@ data:
 model:
   n_channels: 3
   vit_num_tokens: 7
-  vit_hidden_size: 32
-  vit_num_layers: 5
-  gru_hidden_size: 24
-  gru_num_layers: 3
+  vit_hidden_size: 64
+  vit_num_layers: 6
+  gru_hidden_size: 128
+  gru_num_layers: 4
   jump_size: 1
 optimizer:
-  learning_rate: 1.0e-5
+  learning_rate: 1.0e-6
 reinforce:
   n_iterations: 200000
   log_every: 100
