@@ -19,6 +19,7 @@ model:
 optimizer:
   learning_rate: 1.0e-5
 reinforce:
+  entropy_weight: 1.0e-2
   n_iterations: 16000
   log_every: 50
   plot_every: 500

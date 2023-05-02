@@ -17,8 +17,9 @@ model:
   gru_num_layers: 4
   jump_size: 1
 optimizer:
-  learning_rate: 1.0e-6
+  learning_rate: 1.0e-5
 reinforce:
+  entropy_weight: 1.0e-2
   n_iterations: 200000
   log_every: 100
   plot_every: 500

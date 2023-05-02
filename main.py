@@ -135,6 +135,7 @@ def main(config: DictConfig):
         test_loader=test_loader,
         patch_size=config.env.patch_size,
         max_ep_len=config.env.max_ep_len,
+        entropy_weight=config.reinforce.entropy_weight,
         n_iterations=config.reinforce.n_iterations,
         log_every=config.reinforce.log_every,
         plot_every=config.reinforce.plot_every,

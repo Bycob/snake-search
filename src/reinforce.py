@@ -31,6 +31,7 @@ class Reinforce:
         test_loader: DataLoader,
         patch_size: int,
         max_ep_len: int,
+        entropy_weight: float,
         n_iterations: int,
         log_every: int,
         plot_every: int,
@@ -42,6 +43,7 @@ class Reinforce:
         self.test_loader = test_loader
         self.patch_size = patch_size
         self.max_ep_len = max_ep_len
+        self.entropy_weight = entropy_weight
         self.n_iterations = n_iterations
         self.log_every = log_every
         self.plot_every = plot_every
@@ -71,7 +73,7 @@ class Reinforce:
 
     def sample_from_logits(
         self, logits: dict[str, torch.Tensor]
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         actions = torch.zeros(
             (logits["jumps_x"].shape[0], 2),
             dtype=torch.long,
@@ -82,13 +84,19 @@ class Reinforce:
             dtype=torch.float,
             device=self.device,
         )
+        entropies = torch.zeros(
+            (logits["jumps_x"].shape[0], 2),
+            dtype=torch.float,
+            device=self.device,
+        )
         for action_id, action_name in enumerate(["jumps_x", "jumps_y"]):
             categorical = Categorical(logits=logits[action_name])
             sampled_actions = categorical.sample()
             actions[:, action_id] = sampled_actions
             logprobs[:, action_id] = categorical.log_prob(sampled_actions)
+            entropies[:, action_id] = categorical.entropy()
 
-        return actions, logprobs
+        return actions, logprobs, entropies
 
     def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
         """Do a rollout on the given environment.
@@ -99,6 +107,10 @@ class Reinforce:
             device=self.device,
         )
         logprobs = torch.zeros(
+            (env.batch_size, env.max_ep_len),
+            device=self.device,
+        )
+        entropies = torch.zeros(
             (env.batch_size, env.max_ep_len),
             device=self.device,
         )
@@ -118,13 +130,14 @@ class Reinforce:
 
         for step_id in range(env.max_ep_len):
             logits, memory = self.model(patches, actions, memory)
-            actions, logprobs_ = self.sample_from_logits(logits)
+            actions, logprobs_, entropies_ = self.sample_from_logits(logits)
             patches, step_rewards, terminated, truncated, infos = env.step(
                 actions - self.model.jump_size
             )
 
             rewards[:, step_id] = step_rewards
             logprobs[:, step_id] = logprobs_.sum(dim=1)
+            entropies[:, step_id] = entropies_.sum(dim=1)
             masks[:, step_id] = ~terminated
             percentages = infos["percentages"]
 
@@ -148,6 +161,7 @@ class Reinforce:
             "rewards": rewards,
             "returns": cumulated_returns,
             "logprobs": logprobs,
+            "entropies": entropies,
             "masks": masks,
             "percentages": percentages,
         }
@@ -172,8 +186,12 @@ class Reinforce:
         advantages = (returns - returns.mean(dim=0, keepdim=True)) / (
             returns.std(dim=0, keepdim=True) + 1e-8
         )
-        metrics["loss"] = (
+        metrics["action-loss"] = (
             -(rollout["logprobs"] * advantages * masks).sum() / masks.sum()
+        )
+        metrics["entropy-loss"] = -(rollout["entropies"] * masks).sum() / masks.sum()
+        metrics["loss"] = (
+            metrics["action-loss"] + self.entropy_weight * metrics["entropy-loss"]
         )
         metrics["returns"] = (rollout["rewards"] * masks).sum(dim=1).mean()
         metrics["percentages"] = rollout["percentages"].mean()
@@ -243,9 +261,6 @@ class Reinforce:
                     metrics["trajectories/train-images"] = wandb.Image(plots / 255)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
                     self.tensor_to_gif(gifs[0], "train.gif")
-                    # metrics["trajectories/train-gif"] = wandb.Video(
-                    #     "train.gif", fps=3, format="gif"
-                    # )
 
                     env = self.load_env(test_iter, augment=False)
                     positions, masks = self.predict(env)
@@ -253,9 +268,6 @@ class Reinforce:
                     metrics["trajectories/test-images"] = wandb.Image(plots / 255)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
                     self.tensor_to_gif(gifs[0], "test.gif")
-                    # metrics["trajectories/test-gif"] = wandb.Video(
-                    #     "test.gif", fps=3, format="gif"
-                    # )
 
                     self.checkpoint(step_id)
 
@@ -335,7 +347,7 @@ class Reinforce:
         for step_id in range(env.max_ep_len):
             logits, memory = self.model(patches, actions, memory)
             # actions = logits.argmax(dim=1)  # Greedy policy.
-            actions, _ = self.sample_from_logits(logits)
+            actions, _, _ = self.sample_from_logits(logits)
 
             patches, _, terminated, _, infos = env.step(actions - self.model.jump_size)
             positions[:, step_id + 1] = infos["positions"]
