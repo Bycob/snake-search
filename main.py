@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -59,12 +60,14 @@ def init_dataloaders(
 ) -> tuple[DataLoader, DataLoader]:
     match config.data.fill_mode:
         case "resize":
-            collate_fn = lambda b: NeedleDataset.resize_collate_fn(
-                b, config.env.patch_size
+            collate_fn = partial(
+                NeedleDataset.resize_collate_fn,
+                patch_size=config.env.patch_size,
             )
         case "pad":
-            collate_fn = lambda b: NeedleDataset.padded_collate_fn(
-                b, config.env.patch_size
+            collate_fn = partial(
+                NeedleDataset.padded_collate_fn,
+                patch_size=config.env.patch_size,
             )
         case _:
             raise ValueError(f"Unknown fill mode: {config.data.fill_mode}")
