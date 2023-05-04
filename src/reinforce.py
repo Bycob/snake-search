@@ -2,6 +2,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterator
 
+import einops
 import kornia.augmentation as aug
 import torch
 import wandb
@@ -31,6 +32,7 @@ class Reinforce:
         test_loader: DataLoader,
         patch_size: int,
         max_ep_len: int,
+        n_glimps_levels: int,
         entropy_weight: float,
         n_iterations: int,
         log_every: int,
@@ -43,6 +45,7 @@ class Reinforce:
         self.test_loader = test_loader
         self.patch_size = patch_size
         self.max_ep_len = max_ep_len
+        self.n_glimps_levels = n_glimps_levels
         self.entropy_weight = entropy_weight
         self.n_iterations = n_iterations
         self.log_every = log_every
@@ -129,6 +132,7 @@ class Reinforce:
         patches, _ = env.reset()
 
         for step_id in range(env.max_ep_len):
+            patches = einops.rearrange(patches, "b g c h w -> b (g c) h w")
             logits, memory = self.model(patches, actions, memory)
             actions, logprobs_, entropies_ = self.sample_from_logits(logits)
             patches, step_rewards, terminated, truncated, infos = env.step(
@@ -232,7 +236,13 @@ class Reinforce:
                 images, bboxes = next(train_iter)
                 images, bboxes = images.to(self.device), bboxes.to(self.device)
                 images, bboxes = self.augment_batch(images, bboxes)
-                env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+                env = NeedleEnv(
+                    images,
+                    bboxes,
+                    self.patch_size,
+                    self.max_ep_len,
+                    self.n_glimps_levels,
+                )
 
                 rollout = self.rollout(env)
                 metrics = self.compute_metrics(rollout)
@@ -285,7 +295,9 @@ class Reinforce:
             images, bboxes = next(iter_loader)
             images, bboxes = images.to(self.device), bboxes.to(self.device)
 
-            env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+            env = NeedleEnv(
+                images, bboxes, self.patch_size, self.max_ep_len, self.n_glimps_levels
+            )
 
             rollout = self.rollout(env)
             metrics = self.compute_metrics(rollout)
@@ -308,7 +320,9 @@ class Reinforce:
         bboxes = bboxes[:n_predictions]
         if augment:
             images, bboxes = self.augment_batch(images, bboxes)
-        env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+        env = NeedleEnv(
+            images, bboxes, self.patch_size, self.max_ep_len, self.n_glimps_levels
+        )
         return env
 
     @torch.no_grad()
@@ -345,6 +359,7 @@ class Reinforce:
         masks[:, 0] = True
 
         for step_id in range(env.max_ep_len):
+            patches = einops.rearrange(patches, "b g c h w -> b (g c) h w")
             logits, memory = self.model(patches, actions, memory)
             # actions = logits.argmax(dim=1)  # Greedy policy.
             actions, _, _ = self.sample_from_logits(logits)
@@ -380,7 +395,7 @@ class Reinforce:
         images = [
             draw_image_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
-                env.images, positions, masks, env.bboxes.to_tensor()
+                env.images[:, 0], positions, masks, env.bboxes.to_tensor()
             )
         ]
         images = torch.stack(images, dim=0)
@@ -407,7 +422,7 @@ class Reinforce:
         gifs = [
             draw_gif_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
-                env.images, positions, masks, env.bboxes.to_tensor()
+                env.images[:, 0], positions, masks, env.bboxes.to_tensor()
             )
         ]
         return gifs

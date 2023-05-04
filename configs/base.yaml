@@ -2,6 +2,7 @@ group: CelebA
 env:
   patch_size: 32
   max_ep_len: 20
+  n_glimps_levels: 3
 data:
   batch_size: 600
   num_workers: 0

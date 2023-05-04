@@ -1,6 +1,7 @@
 import einops
 import gymnasium as gym
 import torch
+import torchvision.transforms.functional as TF
 from kornia.geometry.boxes import Boxes
 from torch import Tensor
 
@@ -12,6 +13,7 @@ class NeedleEnv(gym.Env):
         bboxes: Boxes,
         patch_size: int,
         max_ep_len: int,
+        n_glimps_levels: int,
     ):
         """Creates a batched environment for the needle problem.
 
@@ -22,13 +24,17 @@ class NeedleEnv(gym.Env):
             bboxes: The bounding boxes of the batch.
                 List of length `batch_size`, where each element is
                 a tensor of shape [n_bboxes, 4].
+            patch_size: The size of the patches.
+            max_ep_len: The maximum number of steps in an episode.
+            n_glimps_levels: The number of levels of glimpses for each patch.
         """
         assert images.shape[0] == bboxes.shape[0]
         assert len(images.shape) == 4
+        assert n_glimps_levels > 0
 
-        self.images = images
         self.patch_size = patch_size
         self.max_ep_len = max_ep_len
+        self.n_glimps_levels = n_glimps_levels
 
         # Save the batch dimensions.
         self.batch_size, self.n_channels, self.height, self.width = images.shape
@@ -42,7 +48,7 @@ class NeedleEnv(gym.Env):
         self.n_horizontal_patches = self.width // self.patch_size
 
         # The device is the same as the images.
-        self.device = self.images.device
+        self.device = images.device
 
         # Observation and action spaces.
         self.observation_space = gym.spaces.Box(
@@ -62,8 +68,42 @@ class NeedleEnv(gym.Env):
         self.bbox_masks = self.convert_bboxes_to_masks(bboxes)
         self.bboxes = bboxes
 
+        # Initialize the glimps patches.
+        self.init_glimps_images(images)
+
         # Initialize some variables for the environment.
         self.init_env_variables()
+
+    def init_glimps_images(self, images: torch.Tensor):
+        """Build the glimps images from the original images.
+        They represent progressive lower resolution images.
+
+        The input token of the model is a slice of the glimps images.
+        """
+        glimps_images = []
+        current_glimps = images
+
+        # Progressively adds padding to the glimps and resizes it to the original size.
+        for _ in range(self.n_glimps_levels):
+            glimps_images.append(current_glimps)
+
+            # Pad all sides of the images of `patch_size` pixels.
+            current_glimps = TF.pad(
+                current_glimps,
+                padding=[self.patch_size] * 4,
+                padding_mode="constant",
+                fill=0,
+            )
+            # Resize the images to the original size.
+            current_glimps = TF.resize(
+                current_glimps,
+                size=[self.height, self.width],
+                antialias=True,
+            )
+
+        # Stack the images.
+        # Final shape is [batch_size, n_glimps_levels, n_channels, height, width].
+        self.images = torch.stack(glimps_images, dim=1)
 
     def init_env_variables(self):
         # Positions of the agents in the images.
@@ -269,12 +309,16 @@ class NeedleEnv(gym.Env):
         pixel_indices = pixel_indices.unsqueeze(0) + offsets.unsqueeze(1)
 
         # Add the channels dimension.
-        pixel_indices = einops.repeat(pixel_indices, "b p -> b c p", c=self.n_channels)
+        pixel_indices = einops.repeat(
+            pixel_indices, "b p -> b g c p", c=self.n_channels, g=self.n_glimps_levels
+        )
 
         # Finally gather the pixels.
-        images = einops.rearrange(self.images, "b c h w -> b c (h w)")
-        patches = torch.gather(images, dim=2, index=pixel_indices)
-        patches = einops.rearrange(patches, "b c (h w) -> b c h w", h=self.patch_size)
+        images = einops.rearrange(self.images, "b g c h w -> b g c (h w)")
+        patches = torch.gather(images, dim=3, index=pixel_indices)
+        patches = einops.rearrange(
+            patches, "b g c (h w) -> b g c h w", h=self.patch_size
+        )
         return patches
 
     @property
