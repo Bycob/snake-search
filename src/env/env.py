@@ -91,8 +91,9 @@ class NeedleEnv(gym.Env):
             current_glimps = TF.pad(
                 current_glimps,
                 padding=[self.patch_size] * 4,
-                padding_mode="constant",
-                fill=0,
+                padding_mode="reflect",
+                # padding_mode="constant",
+                # fill=0,
             )
             # Resize the images to the original size.
             current_glimps = TF.resize(
