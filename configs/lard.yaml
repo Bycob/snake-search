@@ -4,7 +4,7 @@ env:
   max_ep_len: 40
   n_glimps_levels: 3
 data:
-  batch_size: 30
+  batch_size: 20
   num_workers: 0
   dataset: standard
   fill_mode: resize # Either "resize" or "pad"
@@ -12,10 +12,10 @@ data:
 model:
   n_channels: 3
   vit_num_tokens: 7
-  vit_hidden_size: 48
+  vit_hidden_size: 24
   vit_num_layers: 6
   gru_hidden_size: 128
-  gru_num_layers: 3
+  gru_num_layers: 2
   jump_size: 1
 optimizer:
   learning_rate: 1.0e-5
