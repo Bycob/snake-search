@@ -2,7 +2,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterator
 
-import kornia.augmentation as aug
 import torch
 import wandb
 from kornia.geometry.boxes import Boxes
@@ -49,22 +48,11 @@ class Reinforce:
         self.checkpoint_dir = Path("checkpoints")
         self.checkpoint_dir.mkdir(exist_ok=True)
 
-        # self.augmentations = aug.AugmentationSequential(
-        #     aug.RandomHorizontalFlip(p=0.5),
-        #     aug.RandomAffine(degrees=5, translate=(1 / 4, 1 / 3), p=0.5),
-        #     data_keys=["input", "bbox"],
-        # )
-
     @torch.no_grad()
     def augment_batch(
         self, images: torch.Tensor, bboxes: Boxes
     ) -> tuple[torch.Tensor, Boxes]:
         """Apply augmentations to a batch of images and bboxes."""
-        # image_dtype = images.dtype
-        # images = images.to(bboxes.dtype)
-        # images, bboxes = self.augmentations(images, bboxes)
-        # images = images.to(image_dtype)
-        # return images, bboxes
         images, bboxes = random_horizontal_flip(images, bboxes, p=0.5)
         return images, bboxes
 
