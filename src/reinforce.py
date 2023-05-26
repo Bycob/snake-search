@@ -2,10 +2,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterator
 
+import einops
 import torch
 import wandb
 from kornia.geometry.boxes import Boxes
 from torch.distributions import Categorical
+from torch.nn.utils import clip_grad
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -29,6 +31,8 @@ class Reinforce:
         test_loader: DataLoader,
         patch_size: int,
         max_ep_len: int,
+        n_glimps_levels: int,
+        entropy_weight: float,
         n_iterations: int,
         log_every: int,
         plot_every: int,
@@ -40,6 +44,8 @@ class Reinforce:
         self.test_loader = test_loader
         self.patch_size = patch_size
         self.max_ep_len = max_ep_len
+        self.n_glimps_levels = n_glimps_levels
+        self.entropy_weight = entropy_weight
         self.n_iterations = n_iterations
         self.log_every = log_every
         self.plot_every = plot_every
@@ -58,7 +64,7 @@ class Reinforce:
 
     def sample_from_logits(
         self, logits: dict[str, torch.Tensor]
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         actions = torch.zeros(
             (logits["jumps_x"].shape[0], 2),
             dtype=torch.long,
@@ -69,13 +75,19 @@ class Reinforce:
             dtype=torch.float,
             device=self.device,
         )
+        entropies = torch.zeros(
+            (logits["jumps_x"].shape[0], 2),
+            dtype=torch.float,
+            device=self.device,
+        )
         for action_id, action_name in enumerate(["jumps_x", "jumps_y"]):
             categorical = Categorical(logits=logits[action_name])
             sampled_actions = categorical.sample()
             actions[:, action_id] = sampled_actions
             logprobs[:, action_id] = categorical.log_prob(sampled_actions)
+            entropies[:, action_id] = categorical.entropy()
 
-        return actions, logprobs
+        return actions, logprobs, entropies
 
     def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
         """Do a rollout on the given environment.
@@ -86,6 +98,10 @@ class Reinforce:
             device=self.device,
         )
         logprobs = torch.zeros(
+            (env.batch_size, env.max_ep_len),
+            device=self.device,
+        )
+        entropies = torch.zeros(
             (env.batch_size, env.max_ep_len),
             device=self.device,
         )
@@ -104,14 +120,16 @@ class Reinforce:
         patches, _ = env.reset()
 
         for step_id in range(env.max_ep_len):
+            patches = einops.rearrange(patches, "b g c h w -> b (g c) h w")
             logits, memory = self.model(patches, actions, memory)
-            actions, logprobs_ = self.sample_from_logits(logits)
+            actions, logprobs_, entropies_ = self.sample_from_logits(logits)
             patches, step_rewards, terminated, truncated, infos = env.step(
                 actions - self.model.jump_size
             )
 
             rewards[:, step_id] = step_rewards
             logprobs[:, step_id] = logprobs_.sum(dim=1)
+            entropies[:, step_id] = entropies_.sum(dim=1)
             masks[:, step_id] = ~terminated
             percentages = infos["percentages"]
 
@@ -135,6 +153,7 @@ class Reinforce:
             "rewards": rewards,
             "returns": cumulated_returns,
             "logprobs": logprobs,
+            "entropies": entropies,
             "masks": masks,
             "percentages": percentages,
         }
@@ -159,8 +178,12 @@ class Reinforce:
         advantages = (returns - returns.mean(dim=0, keepdim=True)) / (
             returns.std(dim=0, keepdim=True) + 1e-8
         )
-        metrics["loss"] = (
+        metrics["action-loss"] = (
             -(rollout["logprobs"] * advantages * masks).sum() / masks.sum()
+        )
+        metrics["entropy-loss"] = -(rollout["entropies"] * masks).sum() / masks.sum()
+        metrics["loss"] = (
+            metrics["action-loss"] + self.entropy_weight * metrics["entropy-loss"]
         )
         metrics["returns"] = (rollout["rewards"] * masks).sum(dim=1).mean()
         metrics["percentages"] = rollout["percentages"].mean()
@@ -201,13 +224,20 @@ class Reinforce:
                 images, bboxes = next(train_iter)
                 images, bboxes = images.to(self.device), bboxes.to(self.device)
                 images, bboxes = self.augment_batch(images, bboxes)
-                env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+                env = NeedleEnv(
+                    images,
+                    bboxes,
+                    self.patch_size,
+                    self.max_ep_len,
+                    self.n_glimps_levels,
+                )
 
                 rollout = self.rollout(env)
                 metrics = self.compute_metrics(rollout)
 
                 self.optimizer.zero_grad()
                 metrics["loss"].backward()
+                clip_grad.clip_grad_value_(self.model.parameters(), 1)
                 self.optimizer.step()
 
                 metrics = dict()
@@ -229,9 +259,6 @@ class Reinforce:
                     metrics["trajectories/train-images"] = wandb.Image(plots / 255)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
                     self.tensor_to_gif(gifs[0], "train.gif")
-                    # metrics["trajectories/train-gif"] = wandb.Video(
-                    #     "train.gif", fps=3, format="gif"
-                    # )
 
                     env = self.load_env(test_iter, augment=False)
                     positions, masks = self.predict(env)
@@ -239,9 +266,6 @@ class Reinforce:
                     metrics["trajectories/test-images"] = wandb.Image(plots / 255)
                     gifs = self.animate_trajectories(env, positions[:1], masks)
                     self.tensor_to_gif(gifs[0], "test.gif")
-                    # metrics["trajectories/test-gif"] = wandb.Video(
-                    #     "test.gif", fps=3, format="gif"
-                    # )
 
                     self.checkpoint(step_id)
 
@@ -259,7 +283,9 @@ class Reinforce:
             images, bboxes = next(iter_loader)
             images, bboxes = images.to(self.device), bboxes.to(self.device)
 
-            env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+            env = NeedleEnv(
+                images, bboxes, self.patch_size, self.max_ep_len, self.n_glimps_levels
+            )
 
             rollout = self.rollout(env)
             metrics = self.compute_metrics(rollout)
@@ -282,7 +308,9 @@ class Reinforce:
         bboxes = bboxes[:n_predictions]
         if augment:
             images, bboxes = self.augment_batch(images, bboxes)
-        env = NeedleEnv(images, bboxes, self.patch_size, self.max_ep_len)
+        env = NeedleEnv(
+            images, bboxes, self.patch_size, self.max_ep_len, self.n_glimps_levels
+        )
         return env
 
     @torch.no_grad()
@@ -319,9 +347,10 @@ class Reinforce:
         masks[:, 0] = True
 
         for step_id in range(env.max_ep_len):
+            patches = einops.rearrange(patches, "b g c h w -> b (g c) h w")
             logits, memory = self.model(patches, actions, memory)
             # actions = logits.argmax(dim=1)  # Greedy policy.
-            actions, _ = self.sample_from_logits(logits)
+            actions, _, _ = self.sample_from_logits(logits)
 
             patches, _, terminated, _, infos = env.step(actions - self.model.jump_size)
             positions[:, step_id + 1] = infos["positions"]
@@ -354,7 +383,7 @@ class Reinforce:
         images = [
             draw_image_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
-                env.images, positions, masks, env.bboxes.to_tensor()
+                env.images[:, 0], positions, masks, env.bboxes.to_tensor()
             )
         ]
         images = torch.stack(images, dim=0)
@@ -381,7 +410,7 @@ class Reinforce:
         gifs = [
             draw_gif_prediction(image, pos[mask], bboxes, env.patch_size)
             for image, pos, mask, bboxes in zip(
-                env.images, positions, masks, env.bboxes.to_tensor()
+                env.images[:, 0], positions, masks, env.bboxes.to_tensor()
             )
         ]
         return gifs

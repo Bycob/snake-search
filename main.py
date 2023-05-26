@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 
 import hydra
@@ -59,12 +60,14 @@ def init_dataloaders(
 ) -> tuple[DataLoader, DataLoader]:
     match config.data.fill_mode:
         case "resize":
-            collate_fn = lambda b: NeedleDataset.resize_collate_fn(
-                b, config.env.patch_size
+            collate_fn = partial(
+                NeedleDataset.resize_collate_fn,
+                patch_size=config.env.patch_size,
             )
         case "pad":
-            collate_fn = lambda b: NeedleDataset.padded_collate_fn(
-                b, config.env.patch_size
+            collate_fn = partial(
+                NeedleDataset.padded_collate_fn,
+                patch_size=config.env.patch_size,
             )
         case _:
             raise ValueError(f"Unknown fill mode: {config.data.fill_mode}")
@@ -92,9 +95,9 @@ def init_dataloaders(
     return train_loader, test_loader
 
 
-def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
+def init_model(config: DictConfig) -> GRUPolicy:
     model = GRUPolicy(
-        n_channels=config.model.n_channels,
+        n_channels=config.model.n_channels * config.env.n_glimps_levels,
         patch_size=config.env.patch_size,
         vit_num_tokens=config.model.vit_num_tokens,
         vit_hidden_size=config.model.vit_hidden_size,
@@ -103,8 +106,7 @@ def init_model(config: DictConfig, dataset: NeedleDataset) -> GRUPolicy:
         gru_num_layers=config.model.gru_num_layers,
         jump_size=config.model.jump_size,
     )
-    image, _ = dataset[0]
-    n_channels = image.shape[0]
+    n_channels = config.model.n_channels * config.env.n_glimps_levels
     patches = torch.zeros((1, n_channels, config.env.patch_size, config.env.patch_size))
     actions = torch.zeros((1, 2), dtype=torch.long)
     summary(
@@ -126,7 +128,7 @@ def main(config: DictConfig):
 
     train_dataset, test_dataset = init_datasets(config)
     train_lodaer, test_loader = init_dataloaders(config, train_dataset, test_dataset)
-    model = init_model(config, train_dataset)
+    model = init_model(config)
     optimizer = init_optimizer(config, model)
     reinforce = Reinforce(
         model=model,
@@ -135,6 +137,8 @@ def main(config: DictConfig):
         test_loader=test_loader,
         patch_size=config.env.patch_size,
         max_ep_len=config.env.max_ep_len,
+        n_glimps_levels=config.env.n_glimps_levels,
+        entropy_weight=config.reinforce.entropy_weight,
         n_iterations=config.reinforce.n_iterations,
         log_every=config.reinforce.log_every,
         plot_every=config.reinforce.plot_every,

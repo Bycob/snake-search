@@ -3,6 +3,7 @@ group: LARD
 env:
   patch_size: 224
   max_ep_len: 40
+  n_glimps_levels: 3
 
 data:
   batch_size: 10
@@ -24,6 +25,7 @@ optimizer:
   learning_rate: 1.0e-5
 
 reinforce:
+  entropy_weight: 1.0e-2
   n_iterations: 200000
   log_every: 100
   plot_every: 500
