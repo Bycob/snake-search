@@ -6,11 +6,12 @@ did not implement this feature.
 It takes into account the bounding boxes and transforms them as well.
 """
 import torch
+from typing import Tuple
 from einops import repeat
 from kornia.geometry.boxes import Boxes
 
 
-def scramble(images: torch.Tensor, boxes: Boxes) -> tuple[torch.Tensor, Boxes]:
+def scramble(images: torch.Tensor, boxes: Boxes) -> Tuple[torch.Tensor, Boxes]:
     # Scramble the images and boxes.
     perm = torch.randperm(images.shape[0])
     images = images[perm]
@@ -18,7 +19,7 @@ def scramble(images: torch.Tensor, boxes: Boxes) -> tuple[torch.Tensor, Boxes]:
     return images, boxes
 
 
-def horizontal_flip(images: torch.Tensor, boxes: Boxes) -> tuple[torch.Tensor, Boxes]:
+def horizontal_flip(images: torch.Tensor, boxes: Boxes) -> Tuple[torch.Tensor, Boxes]:
     """Flip an image and its bounding boxes horizontally.
 
     ---
@@ -50,7 +51,7 @@ def horizontal_flip(images: torch.Tensor, boxes: Boxes) -> tuple[torch.Tensor, B
     return flipped_images, flipped_boxes
 
 
-def vertical_flip(images: torch.Tensor, boxes: Boxes) -> tuple[torch.Tensor, Boxes]:
+def vertical_flip(images: torch.Tensor, boxes: Boxes) -> Tuple[torch.Tensor, Boxes]:
     """Flip an image and its bounding boxes vertically.
 
     ---
@@ -84,7 +85,7 @@ def vertical_flip(images: torch.Tensor, boxes: Boxes) -> tuple[torch.Tensor, Box
 
 def random_horizontal_flip(
     images: torch.Tensor, boxes: Boxes, p: float = 0.5
-) -> tuple[torch.Tensor, Boxes]:
+) -> Tuple[torch.Tensor, Boxes]:
     """Randomly flip horizontally images and their bounding boxes.
 
     ---
@@ -112,7 +113,7 @@ def random_horizontal_flip(
 
 def random_vertical_flip(
     images: torch.Tensor, boxes: Boxes, p: float = 0.5
-) -> tuple[torch.Tensor, Boxes]:
+) -> Tuple[torch.Tensor, Boxes]:
     """Randomly flip vertically images and their bounding boxes.
 
     ---
@@ -140,7 +141,7 @@ def random_translate(
     boxes: Boxes,
     delta_x: float,
     delta_y: float,
-) -> tuple[torch.Tensor, Boxes]:
+) -> Tuple[torch.Tensor, Boxes]:
     """Randomly translate images and their bounding boxes.
     Note: The images will warp around the edges, but not the boxes!
 

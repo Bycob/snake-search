@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Tuple, List, Dict, Optional
 
 import einops
 import torch
@@ -139,7 +139,7 @@ class GRUPolicy(nn.Module):
         x: torch.Tensor,
         actions: torch.Tensor,
         memory: Optional[torch.Tensor] = None,
-    ) -> tuple[dict[str, torch.Tensor], Optional[torch.Tensor]]:
+    ) -> Tuple[Dict[str, torch.Tensor], Optional[torch.Tensor]]:
         """Predict the action to take for each patch in the batch.
         It is a one-step prediction, the memory is used to remember about
         the previous encountered patches.

@@ -11,16 +11,17 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset, random_split
 from torchvision.io import ImageReadMode, read_image
+from typing import Tuple, List
 
 
 class StandardDataset(Dataset):
-    def __init__(self, images: list[Path], annotations: list[Path]):
+    def __init__(self, images: List[Path], annotations: List[Path]):
         self.images = images
         self.annotations = annotations
 
         assert len(self.images) == len(self.annotations)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         # Load image from disk.
         image = read_image(str(self.images[index]), ImageReadMode.RGB)
         bboxes = StandardDataset.read_bbox(self.annotations[index])
@@ -58,7 +59,7 @@ class StandardDataset(Dataset):
         return cls(images, annotations)
 
     @classmethod
-    def load_from_dir(cls, dir_path: Path) -> tuple:
+    def load_from_dir(cls, dir_path: Path) -> Tuple:
         """Return a train and test dataset loaded from the directory.
 
         It tests if there's a `train.txt` and `test.txt` present in the directory.

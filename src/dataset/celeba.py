@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import CelebA
 from torchvision.transforms import PILToTensor
+from typing import Tuple
 
 
 class CelebADataset(Dataset):
@@ -22,7 +23,7 @@ class CelebADataset(Dataset):
         )
         self.transform = PILToTensor()
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """Load an image and its left eye bounding box.
 
         ---

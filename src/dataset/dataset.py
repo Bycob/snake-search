@@ -2,6 +2,7 @@ import torch
 from kornia.geometry.boxes import Boxes
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import resize
+from typing import Tuple, List
 
 
 class NeedleDataset(Dataset):
@@ -12,7 +13,7 @@ class NeedleDataset(Dataset):
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """Load the celebA image and landmarks and returns
         the image and its landmarks.
 
@@ -35,8 +36,8 @@ class NeedleDataset(Dataset):
 
     @staticmethod
     def padded_collate_fn(
-        batch: list[tuple[torch.Tensor, torch.Tensor]], patch_size: int
-    ) -> tuple[torch.Tensor, Boxes]:
+        batch: List[Tuple[torch.Tensor, torch.Tensor]], patch_size: int
+    ) -> Tuple[torch.Tensor, Boxes]:
         """Collate the batch of images and bboxes.
         The images are stacked in a tensor and the bboxes are stacked
         in a kornia boxes object.
@@ -91,8 +92,8 @@ class NeedleDataset(Dataset):
 
     @staticmethod
     def resize_collate_fn(
-        batch: list[tuple[torch.Tensor, torch.Tensor]], patch_size: int
-    ) -> tuple[torch.Tensor, Boxes]:
+        batch: List[Tuple[torch.Tensor, torch.Tensor]], patch_size: int
+    ) -> Tuple[torch.Tensor, Boxes]:
         """Collate the batch of images and bboxes.
         The images are stacked in a tensor and the bboxes are stacked
         in a kornia boxes object.

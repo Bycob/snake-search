@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+from typing import Tuple, List
 
 import hydra
 import torch
@@ -16,7 +17,7 @@ from src.model import GRUPolicy
 from src.reinforce import Reinforce
 
 
-def init_celeba_datasets(config: DictConfig) -> tuple[CelebADataset, CelebADataset]:
+def init_celeba_datasets(config: DictConfig) -> Tuple[CelebADataset, CelebADataset]:
     # Make sure the data is downloaded to the same location every runs.
     root_path = Path(to_absolute_path(config.data.path))
     train_dataset = CelebADataset("train", root_path)
@@ -24,13 +25,13 @@ def init_celeba_datasets(config: DictConfig) -> tuple[CelebADataset, CelebADatas
     return train_dataset, test_dataset
 
 
-def init_standard_datasets(config: DictConfig) -> tuple[StandardDataset, NeedleDataset]:
+def init_standard_datasets(config: DictConfig) -> Tuple[StandardDataset, NeedleDataset]:
     root_path = Path(to_absolute_path(config.data.path))
     train_dataset, test_dataset = StandardDataset.load_from_dir(root_path)
     return train_dataset, test_dataset
 
 
-def init_datasets(config: DictConfig) -> tuple[NeedleDataset, NeedleDataset]:
+def init_datasets(config: DictConfig) -> Tuple[NeedleDataset, NeedleDataset]:
     """Initialize the train and test datasets.
 
     ---
@@ -42,13 +43,12 @@ def init_datasets(config: DictConfig) -> tuple[NeedleDataset, NeedleDataset]:
         train_dataset: The train dataset.
         test_dataset: The test dataset.
     """
-    match config.data.dataset:
-        case "celeba":
-            train_dataset, test_dataset = init_celeba_datasets(config)
-        case "standard":
-            train_dataset, test_dataset = init_standard_datasets(config)
-        case _:
-            raise ValueError(f"Unknown dataset: {config.data.dataset}")
+    if config.data.dataset == "celeba":
+        train_dataset, test_dataset = init_celeba_datasets(config)
+    elif config.data.dataset == "standard":
+        train_dataset, test_dataset = init_standard_datasets(config)
+    else:
+        raise ValueError(f"Unknown dataset: {config.data.dataset}")
 
     train_dataset = NeedleDataset(train_dataset)
     test_dataset = NeedleDataset(test_dataset)
@@ -57,20 +57,19 @@ def init_datasets(config: DictConfig) -> tuple[NeedleDataset, NeedleDataset]:
 
 def init_dataloaders(
     config: DictConfig, train_dataset: NeedleDataset, test_dataset: NeedleDataset
-) -> tuple[DataLoader, DataLoader]:
-    match config.data.fill_mode:
-        case "resize":
-            collate_fn = partial(
-                NeedleDataset.resize_collate_fn,
-                patch_size=config.env.patch_size,
-            )
-        case "pad":
-            collate_fn = partial(
-                NeedleDataset.padded_collate_fn,
-                patch_size=config.env.patch_size,
-            )
-        case _:
-            raise ValueError(f"Unknown fill mode: {config.data.fill_mode}")
+) -> Tuple[DataLoader, DataLoader]:
+    if config.data.fill_mode == "resize":
+        collate_fn = partial(
+            NeedleDataset.resize_collate_fn,
+            patch_size=config.env.patch_size,
+        )
+    elif config.data.fill_mode == "pad":
+        collate_fn = partial(
+            NeedleDataset.padded_collate_fn,
+            patch_size=config.env.patch_size,
+        )
+    else:
+        raise ValueError(f"Unknown fill mode: {config.data.fill_mode}")
 
     train_loader = DataLoader(
         train_dataset,

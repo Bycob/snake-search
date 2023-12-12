@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Tuple, List, Dict
 
 import einops
 import torch
@@ -57,14 +57,14 @@ class Reinforce:
     @torch.no_grad()
     def augment_batch(
         self, images: torch.Tensor, bboxes: Boxes
-    ) -> tuple[torch.Tensor, Boxes]:
+    ) -> Tuple[torch.Tensor, Boxes]:
         """Apply augmentations to a batch of images and bboxes."""
         images, bboxes = random_horizontal_flip(images, bboxes, p=0.5)
         return images, bboxes
 
     def sample_from_logits(
-        self, logits: dict[str, torch.Tensor]
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, logits: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         actions = torch.zeros(
             (logits["jumps_x"].shape[0], 2),
             dtype=torch.long,
@@ -89,7 +89,7 @@ class Reinforce:
 
         return actions, logprobs, entropies
 
-    def rollout(self, env: NeedleEnv) -> dict[str, torch.Tensor]:
+    def rollout(self, env: NeedleEnv) -> Dict[str, torch.Tensor]:
         """Do a rollout on the given environment.
         Returns the rewards, returns and logprobs of the rollout.
         """
@@ -159,8 +159,8 @@ class Reinforce:
         }
 
     def compute_metrics(
-        self, rollout: dict[str, torch.Tensor]
-    ) -> dict[str, torch.Tensor]:
+        self, rollout: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
         """Compute the metrics of the given rollout.
 
         ---
@@ -190,7 +190,7 @@ class Reinforce:
         metrics["episode-length"] = masks.sum(dim=1).float().mean()
         return metrics
 
-    def launch_training(self, group: str, config: dict[str, Any], mode: str = "online"):
+    def launch_training(self, group: str, config: Dict[str, Any], mode: str = "online"):
         """Train the model using REINFORCE.
         The logs are sent to Weights & Biases.
 
@@ -275,7 +275,7 @@ class Reinforce:
     @torch.no_grad()
     def test_model(
         self, iter_loader: DataLoader, n_iters: int
-    ) -> dict[str, torch.Tensor]:
+    ) -> Dict[str, torch.Tensor]:
         """Test the model on the given loader, returns the computed metrics."""
         self.model.eval()
         all_metrics = defaultdict(list)
@@ -314,7 +314,7 @@ class Reinforce:
         return env
 
     @torch.no_grad()
-    def predict(self, env: NeedleEnv) -> tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, env: NeedleEnv) -> Tuple[torch.Tensor, torch.Tensor]:
         """Evaluates the model on a batch of images.
         Return a plot of its trajectories on all images.
 
@@ -392,7 +392,7 @@ class Reinforce:
 
     def animate_trajectories(
         self, env: NeedleEnv, positions: torch.Tensor, masks: torch.Tensor
-    ) -> list[torch.Tensor]:
+    ) -> List[torch.Tensor]:
         """Make a gif from the trajectories of the model on a batch of images.
 
         ---

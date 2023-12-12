@@ -1,3 +1,4 @@
+from typing import Tuple, List
 import einops
 import gymnasium as gym
 import torch
@@ -134,7 +135,7 @@ class NeedleEnv(gym.Env):
             device=self.device,
         )
 
-    def reset(self) -> tuple[Tensor, dict]:
+    def reset(self) -> Tuple[Tensor, dict]:
         """Reset the environment variables.
         Randomly initialize the positions of the agents.
 
@@ -169,7 +170,7 @@ class NeedleEnv(gym.Env):
         return patches, infos
 
     @torch.no_grad()
-    def step(self, actions: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, dict]:
+    def step(self, actions: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor, dict]:
         """Apply the actions, compute the rewards and some contextual information
         and return them.
 
@@ -363,7 +364,7 @@ class NeedleEnv(gym.Env):
         masks = torch.nn.functional.max_pool2d(masks.float(), self.patch_size)
         return masks.bool()
 
-    def parse_bboxes(self, bboxes: list[Tensor]) -> tuple[Tensor, Tensor]:
+    def parse_bboxes(self, bboxes: List[Tensor]) -> Tuple[Tensor, Tensor]:
         """Return the bounding boxes of the images as a tensor.
         Each bounding box of an image is given an id, which will serve as an
         index in the dimension `n_bboxes` of the tensors.
