@@ -200,7 +200,8 @@ class NeedleEnv(gym.Env):
         # Compute the rewards and terminaisons.
         new_scores = self.scores
         delta_rewards = new_scores - previous_scores
-        self.terminated |= new_scores == self.max_scores
+        # This works because sum(unvisited_patches) < 1
+        self.terminated |= new_scores > (self.max_scores - 1)
         truncated = self.steps >= self.max_ep_len
 
         # Give a bonus reward for finishing the episode.
@@ -336,8 +337,13 @@ class NeedleEnv(gym.Env):
         """
         # Logical "OR" on the `n_bboxes` dimension.
         visited_bboxes = self.bbox_masks & self.visited_patches
-        scores = visited_bboxes.sum(dim=(1, 2))
-        return scores
+        rewards = visited_bboxes.sum(dim=(1, 2))
+
+        # Associate cost on negative patches
+        cost_weight = - 1 / self.bbox_masks.numel()
+        visited_empty = (~self.bbox_masks) & self.visited_patches
+        costs = visited_empty.sum(dim=(1,2)) * cost_weight
+        return rewards + costs
 
     @property
     def max_scores(self) -> Tensor:

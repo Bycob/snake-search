@@ -175,9 +175,10 @@ class Reinforce:
         returns = rollout["returns"]
         masks = rollout["masks"]
 
-        advantages = (returns - returns.mean(dim=0, keepdim=True)) / (
-            returns.std(dim=0, keepdim=True) + 1e-8
-        )
+        #advantages = (returns - returns.mean(dim=0, keepdim=True)) / (
+        #    returns.std(dim=0, keepdim=True) + 1e-8
+        #)
+        advantages = returns
         metrics["action-loss"] = (
             -(rollout["logprobs"] * advantages * masks).sum() / masks.sum()
         )
@@ -210,8 +211,8 @@ class Reinforce:
         test_iter = iter(self.test_loader)
 
         with wandb.init(
-            project="snake-search",
-            entity="pierrotlc",
+            project="needle",
+            entity="bycob_gh",
             group=group,
             config=config,
             mode=mode,
